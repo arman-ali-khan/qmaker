@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUser } from '@/lib/auth'
 import { toast } from 'sonner'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Edit, Save, X } from 'lucide-react'
 
 const questionSchema = z.object({
   subject: z.string().min(1, 'Subject is required'),
@@ -47,9 +47,27 @@ interface QuestionFormProps {
   onQuestionAdded: () => void
 }
 
+interface SavedQuestion {
+  id: string
+  subject: string
+  question_no: number
+  question_text: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_answer: string
+  question_set: string | null
+  created_at: string
+}
+
 export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [questions, setQuestions] = useState<QuestionFormData[]>([])
+  const [savedQuestions, setSavedQuestions] = useState<SavedQuestion[]>([])
+  const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<SavedQuestion | null>(null)
+  const [isLoadingSaved, setIsLoadingSaved] = useState(true)
 
   const {
     register,
@@ -64,6 +82,36 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
       question_no: 1,
     },
   })
+
+  useEffect(() => {
+    fetchSavedQuestions()
+  }, [])
+
+  const fetchSavedQuestions = async () => {
+    setIsLoadingSaved(true)
+    try {
+      const user = await getCurrentUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching questions:', error)
+        toast.error('Failed to load questions')
+      } else {
+        setSavedQuestions(data || [])
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('An unexpected error occurred')
+    } finally {
+      setIsLoadingSaved(false)
+    }
+  }
 
   const addQuestion = (data: QuestionFormData) => {
     setQuestions([...questions, data])
@@ -108,12 +156,81 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
       } else {
         toast.success(`${questions.length} question(s) saved successfully!`)
         setQuestions([])
+        fetchSavedQuestions() // Refresh the saved questions list
         onQuestionAdded()
       }
     } catch (error) {
       toast.error('An unexpected error occurred')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const startEdit = (question: SavedQuestion) => {
+    setEditingQuestion(question.id)
+    setEditForm({ ...question })
+  }
+
+  const cancelEdit = () => {
+    setEditingQuestion(null)
+    setEditForm(null)
+  }
+
+  const saveEdit = async () => {
+    if (!editForm) return
+
+    try {
+      const { error } = await supabase
+        .from('questions')
+        .update({
+          subject: editForm.subject,
+          question_no: editForm.question_no,
+          question_text: editForm.question_text,
+          option_a: editForm.option_a,
+          option_b: editForm.option_b,
+          option_c: editForm.option_c,
+          option_d: editForm.option_d,
+          correct_answer: editForm.correct_answer,
+          question_set: editForm.question_set,
+        })
+        .eq('id', editForm.id)
+
+      if (error) {
+        toast.error('Failed to update question')
+        console.error(error)
+      } else {
+        toast.success('Question updated successfully!')
+        setEditingQuestion(null)
+        setEditForm(null)
+        fetchSavedQuestions()
+        onQuestionAdded()
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred')
+      console.error(error)
+    }
+  }
+
+  const deleteQuestion = async (questionId: string) => {
+    if (!confirm('Are you sure you want to delete this question?')) return
+
+    try {
+      const { error } = await supabase
+        .from('questions')
+        .delete()
+        .eq('id', questionId)
+
+      if (error) {
+        toast.error('Failed to delete question')
+        console.error(error)
+      } else {
+        toast.success('Question deleted successfully!')
+        fetchSavedQuestions()
+        onQuestionAdded()
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred')
+      console.error(error)
     }
   }
 
@@ -262,6 +379,204 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
               প্রশ্ন যোগ করুন
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Saved Questions List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold">
+            সংরক্ষিত প্রশ্নসমূহ ({savedQuestions.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingSaved ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : savedQuestions.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              কোন প্রশ্ন সংরক্ষিত নেই
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {savedQuestions.map((question) => (
+                <div key={question.id} className="border rounded-lg p-4 bg-gray-50">
+                  {editingQuestion === question.id ? (
+                    // Edit mode
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>বিষয়</Label>
+                          <Select 
+                            value={editForm?.subject || ''} 
+                            onValueChange={(value) => setEditForm(prev => prev ? {...prev, subject: value} : null)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subjects.map((subject) => (
+                                <SelectItem key={subject} value={subject}>
+                                  {subject}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>প্রশ্ন নং</Label>
+                          <Input
+                            type="number"
+                            value={editForm?.question_no || ''}
+                            onChange={(e) => setEditForm(prev => prev ? {...prev, question_no: parseInt(e.target.value)} : null)}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <Label>প্রশ্নের সেট</Label>
+                        <Input
+                          value={editForm?.question_set || ''}
+                          onChange={(e) => setEditForm(prev => prev ? {...prev, question_set: e.target.value} : null)}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label>প্রশ্ন</Label>
+                        <Textarea
+                          value={editForm?.question_text || ''}
+                          onChange={(e) => setEditForm(prev => prev ? {...prev, question_text: e.target.value} : null)}
+                          rows={3}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>বিকল্প (ক)</Label>
+                          <Input
+                            value={editForm?.option_a || ''}
+                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_a: e.target.value} : null)}
+                          />
+                        </div>
+                        <div>
+                          <Label>বিকল্প (খ)</Label>
+                          <Input
+                            value={editForm?.option_b || ''}
+                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_b: e.target.value} : null)}
+                          />
+                        </div>
+                        <div>
+                          <Label>বিকল্প (গ)</Label>
+                          <Input
+                            value={editForm?.option_c || ''}
+                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_c: e.target.value} : null)}
+                          />
+                        </div>
+                        <div>
+                          <Label>বিকল্প (ঘ)</Label>
+                          <Input
+                            value={editForm?.option_d || ''}
+                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_d: e.target.value} : null)}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <Label>সঠিক উত্তর</Label>
+                        <RadioGroup
+                          value={editForm?.correct_answer || ''}
+                          onValueChange={(value) => setEditForm(prev => prev ? {...prev, correct_answer: value} : null)}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="A" id="edit_correct_a" />
+                            <Label htmlFor="edit_correct_a">ক</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="B" id="edit_correct_b" />
+                            <Label htmlFor="edit_correct_b">খ</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="C" id="edit_correct_c" />
+                            <Label htmlFor="edit_correct_c">গ</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="D" id="edit_correct_d" />
+                            <Label htmlFor="edit_correct_d">ঘ</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button onClick={saveEdit} size="sm">
+                          <Save className="w-4 h-4 mr-2" />
+                          সেভ করুন
+                        </Button>
+                        <Button onClick={cancelEdit} variant="outline" size="sm">
+                          <X className="w-4 h-4 mr-2" />
+                          বাতিল
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // View mode
+                    <>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              {question.subject}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              প্রশ্ন নং: {question.question_no}
+                            </span>
+                            {question.question_set && (
+                              <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
+                                {question.question_set}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="font-medium mb-2">
+                            {question.question_text}
+                          </h3>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEdit(question)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteQuestion(question.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                        <div>ক) {question.option_a}</div>
+                        <div>খ) {question.option_b}</div>
+                        <div>গ) {question.option_c}</div>
+                        <div>ঘ) {question.option_d}</div>
+                      </div>
+                      <div className="text-sm text-green-600">
+                        সঠিক উত্তর: {question.correct_answer === 'A' ? 'ক' : 
+                         question.correct_answer === 'B' ? 'খ' : 
+                         question.correct_answer === 'C' ? 'গ' : 'ঘ'}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        তৈরি: {new Date(question.created_at).toLocaleDateString('bn-BD')}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

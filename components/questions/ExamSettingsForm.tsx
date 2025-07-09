@@ -88,52 +88,68 @@ export default function ExamSettingsForm({ onSettingsUpdated }: ExamSettingsForm
         return
       }
 
-      // Check if settings exist
-      const { data: existingSettings } = await supabase
+      // First, try to upsert the settings
+      const { error } = await supabase
         .from('exam_settings')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
+        .upsert({
+          user_id: user.id,
+          school_name: data.school_name,
+          exam_time: data.exam_time,
+          total_marks: data.total_marks,
+          instructions: data.instructions,
+        }, {
+          onConflict: 'user_id'
+        })
 
-      if (existingSettings) {
-        // Update existing settings
-        const { error } = await supabase
+      if (error) {
+        console.error('Upsert failed, trying insert/update:', error)
+        
+        // If upsert fails, try the old method
+        const { data: existingSettings } = await supabase
           .from('exam_settings')
-          .update({
-            school_name: data.school_name,
-            exam_time: data.exam_time,
-            total_marks: data.total_marks,
-            instructions: data.instructions,
-          })
+          .select('id')
           .eq('user_id', user.id)
+          .single()
 
-        if (error) {
-          toast.error('Failed to update settings')
-          console.error(error)
-        } else {
-          toast.success('Settings updated successfully!')
-          onSettingsUpdated()
-        }
-      } else {
-        // Create new settings
-        const { error } = await supabase
-          .from('exam_settings')
-          .insert({
-            user_id: user.id,
-            school_name: data.school_name,
-            exam_time: data.exam_time,
-            total_marks: data.total_marks,
-            instructions: data.instructions,
-          })
+        if (existingSettings) {
+          // Update existing settings
+          const { error: updateError } = await supabase
+            .from('exam_settings')
+            .update({
+              school_name: data.school_name,
+              exam_time: data.exam_time,
+              total_marks: data.total_marks,
+              instructions: data.instructions,
+            })
+            .eq('user_id', user.id)
 
-        if (error) {
-          toast.error('Failed to save settings')
-          console.error(error)
+          if (updateError) {
+            toast.error('Failed to update settings')
+            console.error(updateError)
+            return
+          }
         } else {
-          toast.success('Settings saved successfully!')
-          onSettingsUpdated()
+          // Create new settings
+          const { error: insertError } = await supabase
+            .from('exam_settings')
+            .insert({
+              user_id: user.id,
+              school_name: data.school_name,
+              exam_time: data.exam_time,
+              total_marks: data.total_marks,
+              instructions: data.instructions,
+            })
+
+          if (insertError) {
+            toast.error('Failed to save settings')
+            console.error(insertError)
+            return
+          }
         }
       }
+
+      toast.success('Settings saved successfully!')
+      onSettingsUpdated()
     } catch (error) {
       toast.error('An unexpected error occurred')
       console.error(error)

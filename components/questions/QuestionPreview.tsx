@@ -47,7 +47,7 @@ export default function QuestionPreview() {
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = useReactToPrint({
-    content: () => printRef.current,
+    contentRef: printRef,
     documentTitle: `${selectedSubject || 'All'} - Questions`,
   })
 
@@ -137,6 +137,28 @@ export default function QuestionPreview() {
     return num.toString().split('').map(digit => banglaNumbers[parseInt(digit)]).join('')
   }
 
+  // Function to split questions into pages with two columns
+  const splitQuestionsIntoPages = (questions: Question[]) => {
+    const questionsPerColumn = 8 // Adjust based on page size
+    const questionsPerPage = questionsPerColumn * 2
+    const pages = []
+    
+    for (let i = 0; i < questions.length; i += questionsPerPage) {
+      const pageQuestions = questions.slice(i, i + questionsPerPage)
+      const leftColumn = pageQuestions.slice(0, questionsPerColumn)
+      const rightColumn = pageQuestions.slice(questionsPerColumn)
+      
+      pages.push({
+        leftColumn,
+        rightColumn
+      })
+    }
+    
+    return pages
+  }
+
+  const questionPages = splitQuestionsIntoPages(filteredQuestions)
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -214,76 +236,127 @@ export default function QuestionPreview() {
             .page-break {
               page-break-after: always;
             }
+            
+            .page-break-before {
+              page-break-before: always;
+            }
+            
+            @page {
+              margin: 1in;
+              size: A4;
+            }
           }
         `}</style>
 
-        <div className="p-8 max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8 bengali-text">
-            <div className="border-2 border-black p-4 mb-4">
-              <h1 className="text-2xl font-bold mb-2">
-                {examSettings.school_name}
-              </h1>
-              <h2 className="text-xl font-semibold mb-2">
-                {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
-              </h2>
-              <div className="flex justify-between items-center text-sm">
-                <span>সময়: {examSettings.exam_time}</span>
-                <span>পূর্ণমান: {examSettings.total_marks}</span>
-              </div>
-              {selectedSet && selectedSet !== 'all' && (
-                <div className="mt-2 text-sm">
-                  <span className="font-semibold">সেট: {selectedSet}</span>
-                </div>
-              )}
+        {filteredQuestions.length === 0 ? (
+          <div className="p-8 max-w-4xl mx-auto">
+            <div className="text-center py-8 text-gray-500">
+              কোন প্রশ্ন পাওয়া যায়নি
             </div>
           </div>
-
-          {/* Instructions */}
-          <div className="mb-6 bengali-text text-sm">
-            <p className="mb-2">
-              <strong>নির্দেশনা:</strong> {examSettings.instructions}
-            </p>
-          </div>
-
-          {/* Questions */}
-          <div className="space-y-4 bengali-text">
-            {filteredQuestions.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                কোন প্রশ্ন পাওয়া যায়নি
-              </div>
-            ) : (
-              filteredQuestions.map((question, index) => (
-                <div key={question.id} className="mb-6">
-                  <div className="font-semibold mb-3 text-base leading-relaxed">
-                    {getBanglaNumber(question.question_no)}। {question.question_text}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm ml-6">
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">(ক)</span>
-                      <span>{question.option_a}</span>
+        ) : (
+          questionPages.map((page, pageIndex) => (
+            <div key={pageIndex} className={`p-8 max-w-4xl mx-auto ${pageIndex > 0 ? 'page-break-before' : ''}`}>
+              {/* Header - only on first page */}
+              {pageIndex === 0 && (
+                <div className="text-center mb-8 bengali-text">
+                  <div className="border-2 border-black p-4 mb-4">
+                    <h1 className="text-2xl font-bold mb-2">
+                      {examSettings.school_name}
+                    </h1>
+                    <h2 className="text-xl font-semibold mb-2">
+                      {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
+                    </h2>
+                    <div className="flex justify-between items-center text-sm">
+                      <span>সময়: {examSettings.exam_time}</span>
+                      <span>পূর্ণমান: {examSettings.total_marks}</span>
                     </div>
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">(খ)</span>
-                      <span>{question.option_b}</span>
-                    </div>
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">(গ)</span>
-                      <span>{question.option_c}</span>
-                    </div>
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">(ঘ)</span>
-                      <span>{question.option_d}</span>
-                    </div>
+                    {selectedSet && selectedSet !== 'all' && (
+                      <div className="mt-2 text-sm">
+                        <span className="font-semibold">সেট: {selectedSet}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              )}
 
-          {/* Answer Key (for print only) */}
-          {filteredQuestions.length > 0 && (
-            <div className="mt-12 print-only hidden">
+              {/* Instructions - only on first page */}
+              {pageIndex === 0 && (
+                <div className="mb-6 bengali-text text-sm">
+                  <p className="mb-2">
+                    <strong>নির্দেশনা:</strong> {examSettings.instructions}
+                  </p>
+                </div>
+              )}
+
+              {/* Questions in two columns */}
+              <div className="grid grid-cols-2 gap-8 bengali-text">
+                {/* Left Column */}
+                <div className="space-y-6">
+                  {page.leftColumn.map((question) => (
+                    <div key={question.id} className="mb-6">
+                      <div className="font-semibold mb-3 text-base leading-relaxed">
+                        {getBanglaNumber(question.question_no)}। {question.question_text}
+                      </div>
+                      <div className="space-y-2 text-sm ml-6">
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(ক)</span>
+                          <span>{question.option_a}</span>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(খ)</span>
+                          <span>{question.option_b}</span>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(গ)</span>
+                          <span>{question.option_c}</span>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(ঘ)</span>
+                          <span>{question.option_d}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-6">
+                  {page.rightColumn.map((question) => (
+                    <div key={question.id} className="mb-6">
+                      <div className="font-semibold mb-3 text-base leading-relaxed">
+                        {getBanglaNumber(question.question_no)}। {question.question_text}
+                      </div>
+                      <div className="space-y-2 text-sm ml-6">
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(ক)</span>
+                          <span>{question.option_a}</span>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(খ)</span>
+                          <span>{question.option_b}</span>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(গ)</span>
+                          <span>{question.option_c}</span>
+                        </div>
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 min-w-[20px]">(ঘ)</span>
+                          <span>{question.option_d}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Answer Key (for print only) - appears after all question pages */}
+        {filteredQuestions.length > 0 && (
+          <div className="p-8 max-w-4xl mx-auto page-break-before print-only hidden">
+            <div className="mt-12">
               <h3 className="text-lg font-bold mb-4 bengali-text">উত্তরমালা</h3>
               <div className="grid grid-cols-4 gap-4 text-sm">
                 {filteredQuestions.map((question) => (
@@ -295,8 +368,9 @@ export default function QuestionPreview() {
                 ))}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
       </div>
     </div>
   )
