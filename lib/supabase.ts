@@ -16,6 +16,13 @@ export type Database = {
           exam_time: string
           total_marks: string
           instructions: string
+          page_size: string
+          margin_top: string
+          margin_bottom: string
+          margin_left: string
+          margin_right: string
+          font_family: string
+          font_size: string
           created_at: string
           updated_at: string
         }
@@ -26,6 +33,13 @@ export type Database = {
           exam_time?: string
           total_marks?: string
           instructions?: string
+          page_size?: string
+          margin_top?: string
+          margin_bottom?: string
+          margin_left?: string
+          margin_right?: string
+          font_family?: string
+          font_size?: string
           created_at?: string
           updated_at?: string
         }
@@ -36,6 +50,13 @@ export type Database = {
           exam_time?: string
           total_marks?: string
           instructions?: string
+          page_size?: string
+          margin_top?: string
+          margin_bottom?: string
+          margin_left?: string
+          margin_right?: string
+          font_family?: string
+          font_size?: string
           created_at?: string
           updated_at?: string
         }
