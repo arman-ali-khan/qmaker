@@ -23,6 +23,7 @@ export type Database = {
           margin_right: string
           font_family: string
           font_size: string
+          exam_type: string
           created_at: string
           updated_at: string
         }
@@ -40,6 +41,7 @@ export type Database = {
           margin_right?: string
           font_family?: string
           font_size?: string
+          exam_type?: string
           created_at?: string
           updated_at?: string
         }
@@ -57,6 +59,7 @@ export type Database = {
           margin_right?: string
           font_family?: string
           font_size?: string
+          exam_type?: string
           created_at?: string
           updated_at?: string
         }

@@ -11,6 +11,8 @@ import { useReactToPrint } from 'react-to-print'
 
 interface ExamSettings {
   school_name: string
+  school_address: string
+  exam_type: string
   exam_time: string
   total_marks: string
   instructions: string
@@ -47,6 +49,8 @@ export default function QuestionPreview() {
   const [isLoading, setIsLoading] = useState(true)
   const [examSettings, setExamSettings] = useState<ExamSettings>({
     school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
+    school_address: '',
+    exam_type: 'বার্ষিক পরীক্ষা',
     exam_time: '২ ঘণ্টা ৩০ মিনিট',
     total_marks: '১০০',
     instructions: 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
@@ -122,6 +126,8 @@ export default function QuestionPreview() {
       } else if (data) {
         setExamSettings({
           school_name: data.school_name,
+          school_address: data.school_address || '',
+          exam_type: data.exam_type,
           exam_time: data.exam_time,
           total_marks: data.total_marks,
           instructions: data.instructions,
@@ -357,7 +363,18 @@ export default function QuestionPreview() {
           </div>
         ) : (
           questionPages.map((page, pageIndex) => (
-            <div key={pageIndex} className={`p-8 max-w-4xl mx-auto ${pageConfig.pageClass} ${pageIndex > 0 ? 'page-break-before' : ''}`}>
+            <div key={pageIndex} className={`p-8 mx-auto ${pageConfig.pageClass} ${pageIndex > 0 ? 'page-break-before' : ''}`} style={{
+              maxWidth: pageConfig.size === 'A4' ? '210mm' : 
+                       pageConfig.size === 'Letter' ? '8.5in' : 
+                       pageConfig.size === 'Legal' ? '8.5in' : '210mm',
+              minHeight: pageConfig.size === 'A4' ? '297mm' : 
+                        pageConfig.size === 'Letter' ? '11in' : 
+                        pageConfig.size === 'Legal' ? '14in' : '297mm',
+              backgroundColor: 'white',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              margin: '20px auto',
+              border: '1px solid #e5e7eb'
+            }}>
               {/* Header - only on first page */}
               {pageIndex === 0 && (
                 <div className="text-center mb-8 bengali-text">
@@ -365,8 +382,13 @@ export default function QuestionPreview() {
                     <h1 className="text-2xl font-bold mb-2">
                       {examSettings.school_name}
                     </h1>
+                    {examSettings.school_address && (
+                      <p className="text-sm mb-2">
+                        {examSettings.school_address}
+                      </p>
+                    )}
                     <h2 className="text-xl font-semibold mb-2">
-                      {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
+                      {examSettings.exam_type} - {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
                     </h2>
                     <div className="flex justify-between items-center text-sm">
                       <span>সময়: {examSettings.exam_time}</span>
