@@ -87,20 +87,20 @@ export default function QuestionPreview() {
     switch (pageSize) {
       case 'Letter':
         return {
-          questionsPerColumn: 15,
+          questionsPerColumn: 9,
           pageClass: 'letter-page',
           size: 'Letter'
         }
       case 'Legal':
         return {
-          questionsPerColumn: 18,
+          questionsPerColumn: 9,
           pageClass: 'legal-page', 
           size: 'Legal'
         }
       case 'A4':
       default:
         return {
-          questionsPerColumn: 12,
+          questionsPerColumn: 9,
           pageClass: 'a4-page',
           size: 'A4'
         }
@@ -333,8 +333,7 @@ export default function QuestionPreview() {
               margin: 0 !important;
               padding: 0 !important;
               -webkit-print-color-adjust: exact;
-              font-size: 12px !important;
-              line-height: 1.3 !important;
+              font-family: ${fontConfig.fontFamily} !important;
             }
             
             .page-break {
@@ -364,9 +363,15 @@ export default function QuestionPreview() {
               box-shadow: none !important;
               border: none !important;
               background: white !important;
+              page-break-after: always;
+            }
+            
+            .print-page:last-child {
+              page-break-after: auto;
             }
             
             .bengali-text {
+              font-family: ${fontConfig.fontFamily} !important;
               font-size: 11px !important;
               line-height: 1.3 !important;
             }
@@ -374,32 +379,37 @@ export default function QuestionPreview() {
             .question-header {
               font-size: 12px !important;
               margin-bottom: 4px !important;
-              line-height: 1.4 !important;
+              line-height: 1.3 !important;
+              font-weight: 600 !important;
             }
             
             .question-options {
               font-size: 10px !important;
               line-height: 1.2 !important;
-              margin-left: 12px !important;
+              margin-left: 8px !important;
             }
             
             .question-item {
               margin-bottom: 8px !important;
+              page-break-inside: avoid;
+              break-inside: avoid;
             }
             
             .exam-header {
               font-size: 14px !important;
-              margin-bottom: 12px !important;
+              margin-bottom: 10px !important;
             }
             
             .exam-title {
               font-size: 16px !important;
               margin-bottom: 6px !important;
+              font-weight: 700 !important;
             }
             
             .exam-subtitle {
               font-size: 14px !important;
               margin-bottom: 6px !important;
+              font-weight: 600 !important;
             }
             
             .exam-instructions {
@@ -409,6 +419,38 @@ export default function QuestionPreview() {
             
             .question-columns {
               gap: 16px !important;
+              display: grid !important;
+              grid-template-columns: 1fr 1fr !important;
+            }
+            
+            .question-column {
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 8px !important;
+            }
+            
+            .option-grid {
+              display: grid !important;
+              grid-template-columns: 1fr !important;
+              gap: 1px !important;
+            }
+            
+            .option-item {
+              display: flex !important;
+              align-items: flex-start !important;
+              gap: 6px !important;
+            }
+            
+            .option-label {
+              font-weight: 600 !important;
+              min-width: 18px !important;
+              flex-shrink: 0 !important;
+            }
+            
+            .option-text {
+              line-height: 1.2 !important;
+              word-break: break-word !important;
+              flex: 1 !important;
             }
           }
           
@@ -470,37 +512,39 @@ export default function QuestionPreview() {
               {/* Instructions - only on first page */}
               {pageIndex === 0 && (
                 <div className="mb-3 bengali-text text-sm avoid-break exam-instructions">
-                  <p className="mb-4">
+                  <p className="mb-3">
                     <strong>নির্দেশনা:</strong> {examSettings.instructions}
                   </p>
                 </div>
               )}
 
               {/* Questions in two columns */}
-              <div className="grid grid-cols-2 gap-4 bengali-text question-columns">
+              <div className="bengali-text question-columns">
                 {/* Left Column */}
-                <div className="space-y-2">
+                <div className="question-column">
                   {page.leftColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
-                      <div className="font-semibold mb-1 text-base leading-tight question-header">
+                      <div className="font-semibold mb-2 text-base leading-tight question-header">
                         {getBanglaNumber(question.question_no)}। {question.question_text}
                       </div>
-                      <div className="grid grid-cols-2 gap-x-1 gap-y-0 text-sm question-options">
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">ক)</span>
-                          <span className="leading-tight">{question.option_a}</span>
+                      <div className="text-sm question-options">
+                        <div className="option-grid">
+                        <div className="option-item">
+                          <span className="option-label">ক)</span>
+                          <span className="option-text">{question.option_a}</span>
                         </div>
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">খ)</span>
-                          <span className="leading-tight">{question.option_b}</span>
+                        <div className="option-item">
+                          <span className="option-label">খ)</span>
+                          <span className="option-text">{question.option_b}</span>
                         </div>
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">গ)</span>
-                          <span className="leading-tight">{question.option_c}</span>
+                        <div className="option-item">
+                          <span className="option-label">গ)</span>
+                          <span className="option-text">{question.option_c}</span>
                         </div>
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">ঘ)</span>
-                          <span className="leading-tight">{question.option_d}</span>
+                        <div className="option-item">
+                          <span className="option-label">ঘ)</span>
+                          <span className="option-text">{question.option_d}</span>
+                        </div>
                         </div>
                       </div>
                     </div>
@@ -508,28 +552,30 @@ export default function QuestionPreview() {
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-2">
+                <div className="question-column">
                   {page.rightColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
-                      <div className="font-semibold mb-1 text-base leading-tight question-header">
+                      <div className="font-semibold mb-2 text-base leading-tight question-header">
                         {getBanglaNumber(question.question_no)}। {question.question_text}
                       </div>
-                      <div className="grid grid-cols-2 gap-x-1 gap-y-0 text-sm question-options">
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">ক)</span>
-                          <span className="leading-tight">{question.option_a}</span>
+                      <div className="text-sm question-options">
+                        <div className="option-grid">
+                        <div className="option-item">
+                          <span className="option-label">ক)</span>
+                          <span className="option-text">{question.option_a}</span>
                         </div>
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">খ)</span>
-                          <span className="leading-tight">{question.option_b}</span>
+                        <div className="option-item">
+                          <span className="option-label">খ)</span>
+                          <span className="option-text">{question.option_b}</span>
                         </div>
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">গ)</span>
-                          <span className="leading-tight">{question.option_c}</span>
+                        <div className="option-item">
+                          <span className="option-label">গ)</span>
+                          <span className="option-text">{question.option_c}</span>
                         </div>
-                        <div className="flex items-start">
-                          <span className="font-medium mr-1 min-w-[14px]">ঘ)</span>
-                          <span className="leading-tight">{question.option_d}</span>
+                        <div className="option-item">
+                          <span className="option-label">ঘ)</span>
+                          <span className="option-text">{question.option_d}</span>
+                        </div>
                         </div>
                       </div>
                     </div>
