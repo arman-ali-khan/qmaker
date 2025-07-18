@@ -9,6 +9,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Printer, Download } from 'lucide-react'
 import { useReactToPrint } from 'react-to-print'
 
+const defaultSubjects = [
+  'বাংলা',
+  'ইংরেজি',
+  'গণিত',
+  'পদার্থবিজ্ঞান',
+  'রসায়ন',
+  'জীববিজ্ঞান',
+  'ইতিহাস',
+  'ভূগোল',
+  'সমাজবিজ্ঞান',
+  'অর্থনীতি',
+]
+
 interface Question {
   id: string
   paper_id: string
@@ -107,14 +120,28 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
         setQuestions(data || [])
         
         // Extract unique subjects and sets
-        const uniqueSubjects = [...new Set((data || []).map(q => q.question_papers?.header_info?.subject).filter(Boolean))]
-        const uniqueSets = [...new Set((data || []).map(q => q.question_papers?.title).filter(Boolean))]
+        const uniqueSubjects = [...new Set((data || [])
+          .map(q => q.question_papers?.header_info?.subject)
+          .filter(Boolean)
+          .filter(subject => subject && subject.trim() !== '')
+        )]
+        const uniqueSets = [...new Set((data || [])
+          .map(q => q.question_papers?.title)
+          .filter(Boolean)
+          .filter(title => title && title.trim() !== '')
+        )]
         
-        setSubjects(uniqueSubjects)
+        console.log('Unique subjects found:', uniqueSubjects)
+        console.log('Unique sets found:', uniqueSets)
+        
+        // Use found subjects or fall back to default subjects if none found
+        setSubjects(uniqueSubjects.length > 0 ? uniqueSubjects : defaultSubjects)
         setQuestionSets(uniqueSets)
       }
     } catch (error) {
       console.error('Error:', error)
+      // Set default subjects on error
+      setSubjects(defaultSubjects)
     } finally {
       setIsLoading(false)
     }

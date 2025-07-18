@@ -177,7 +177,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
             header_info: {
               subject: firstQuestion.subject,
               exam_type: 'MCQ',
-              total_marks: questions.length.toString()
+              total_marks: questions.length.toString(),
+              school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
+              exam_name: 'বার্ষিক পরীক্ষা'
             }
           })
           .select('id')
@@ -227,7 +229,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
     setEditingQuestion(question.id)
     setEditForm({
       id: question.id,
-      subject: question.question_papers?.header_info?.subject || 'Unknown',
+      subject: question.question_papers?.header_info?.subject || 'বাংলা',
       question_no: question.order_index,
       question_text: question.question_text,
       option_a: question.options?.[0] || '',
@@ -485,8 +487,11 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <div>
                           <Label>বিষয়</Label>
                           <Select 
-                            value={editForm?.subject || ''} 
-                            onValueChange={(value) => setEditForm(prev => prev ? {...prev, subject: value} : null)}
+                            value={editForm?.subject || question.question_papers?.header_info?.subject || ''} 
+                            onValueChange={(value) => {
+                              setEditForm(prev => prev ? {...prev, subject: value} : null)
+                              // Also update the question paper's header_info if needed
+                            }}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -601,7 +606,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                              {question.question_papers?.header_info?.subject || 'Unknown'}
+                              {question.question_papers?.header_info?.subject || 'বিষয় অজানা'}
                             </span>
                             <span className="text-sm text-gray-600">
                               প্রশ্ন নং: {question.order_index}
