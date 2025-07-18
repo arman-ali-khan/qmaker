@@ -223,21 +223,39 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
 
       // Update the question paper's header_info with the current subject if needed
       if (paperId) {
-        const { error: updateError } = await supabase
+        // First get the existing header_info to preserve other fields
+        const { data: existingPaper, error: fetchError } = await supabase
           .from('question_papers')
-          .update({
-            header_info: {
-              subject: data.subject,
-              exam_type: 'MCQ',
-              total_marks: '100',
-              school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
-              exam_name: 'বার্ষিক পরীক্ষা'
-            }
-          })
+          .select('header_info')
           .eq('id', paperId)
+          .single()
         
-        if (updateError) {
-          console.error('Error updating question paper header:', updateError)
+        if (!fetchError && existingPaper) {
+          // Only update if the subject is different or if header_info is missing
+          const currentHeaderInfo = existingPaper.header_info || {}
+          const needsUpdate = !currentHeaderInfo.subject || currentHeaderInfo.subject !== data.subject
+          
+          if (needsUpdate) {
+            const updatedHeaderInfo = {
+              ...currentHeaderInfo,
+              subject: data.subject,
+              exam_type: currentHeaderInfo.exam_type || 'MCQ',
+              total_marks: currentHeaderInfo.total_marks || '100',
+              school_name: currentHeaderInfo.school_name || 'বাংলাদেশ শিক্ষা বোর্ড',
+              exam_name: currentHeaderInfo.exam_name || 'বার্ষিক পরীক্ষা'
+            }
+            
+            const { error: updateError } = await supabase
+              .from('question_papers')
+              .update({
+                header_info: updatedHeaderInfo
+              })
+              .eq('id', paperId)
+            
+            if (updateError) {
+              console.error('Error updating question paper header:', updateError)
+            }
+          }
         }
       }
 
@@ -301,23 +319,38 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
     if (!editForm) return
 
     try {
-      // First, update the question paper's header_info with the new subject
+      // First, get the existing question paper to preserve other header info
       const questionToUpdate = savedQuestions.find(q => q.id === editForm.id)
       if (questionToUpdate?.paper_id) {
-        const { error: headerError } = await supabase
+        // Get existing header_info
+        const { data: existingPaper, error: fetchError } = await supabase
           .from('question_papers')
-          .update({
-            header_info: {
-              subject: editForm.subject,
-              exam_type: 'MCQ',
-              school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
-              exam_name: 'বার্ষিক পরীক্ষা'
-            }
-          })
+          .select('header_info')
           .eq('id', questionToUpdate.paper_id)
+          .single()
         
-        if (headerError) {
-          console.error('Error updating question paper header:', headerError)
+        if (!fetchError && existingPaper) {
+          // Only update if the subject is different
+          const currentHeaderInfo = existingPaper.header_info || {}
+          const needsUpdate = !currentHeaderInfo.subject || currentHeaderInfo.subject !== editForm.subject
+          
+          if (needsUpdate) {
+            const updatedHeaderInfo = {
+              ...currentHeaderInfo,
+              subject: editForm.subject
+            }
+            
+            const { error: headerError } = await supabase
+              .from('question_papers')
+              .update({
+                header_info: updatedHeaderInfo
+              })
+              .eq('id', questionToUpdate.paper_id)
+            
+            if (headerError) {
+              console.error('Error updating question paper header:', headerError)
+            }
+          }
         }
       }
 
