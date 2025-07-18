@@ -26,6 +26,9 @@ interface ExamSettings {
     left: number
     right: number
   }
+  question_spacing: number
+  left_column_questions: number
+  right_column_questions: number
 }
 
 interface Subject {
@@ -168,7 +171,10 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
           total_marks: data.header_info?.total_marks || '১০০',
           instructions: data.header_info?.instructions || 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
           page_size: data.page_size || 'A4',
-          margins: data.margins || { top: 25, bottom: 25, left: 25, right: 25 }
+          margins: data.margins || { top: 25, bottom: 25, left: 25, right: 25 },
+          question_spacing: data.question_spacing || 0,
+          left_column_questions: data.left_column_questions || 10,
+          right_column_questions: data.right_column_questions || 10
         }
         setExamSettings(settings)
       } else {
@@ -185,7 +191,10 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
           total_marks: '১০০',
           instructions: 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
           page_size: 'A4',
-          margins: { top: 25, bottom: 25, left: 25, right: 25 }
+          margins: { top: 25, bottom: 25, left: 25, right: 25 },
+          question_spacing: 0,
+          left_column_questions: 10,
+          right_column_questions: 10
         }
         setExamSettings(defaultSettings)
       }
@@ -263,36 +272,59 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
 
   // Function to split questions into pages based on column layout
   const splitQuestionsIntoPages = (questions: Question[]) => {
-    // Group questions by their column layout preference
-    const singleColumnQuestions = questions.filter(q => q.column_layout === 'single-column')
-    const twoColumnQuestions = questions.filter(q => q.column_layout !== 'single-column')
-    
-    const questionsPerColumn = 9
-    const questionsPerPage = questionsPerColumn * 2
     const pages = []
-    
-    // Handle single column questions first
+    const leftColumnQuestions = examSettings?.left_column_questions || 10
+    const rightColumnQuestions = examSettings?.right_column_questions || 10
+    const questionsPerPage = leftColumnQuestions + rightColumnQuestions
     const singleColumnQuestionsPerPage = 18 // More questions per page for single column
-    for (let i = 0; i < singleColumnQuestions.length; i += singleColumnQuestionsPerPage) {
-      const pageQuestions = singleColumnQuestions.slice(i, i + singleColumnQuestionsPerPage)
-      pages.push({
-        leftColumn: pageQuestions,
-        rightColumn: [],
-        layoutType: 'single-column'
-      })
-    }
+
+    let currentIndex = 0
     
-    // Handle two column questions
-    for (let i = 0; i < twoColumnQuestions.length; i += questionsPerPage) {
-      const pageQuestions = twoColumnQuestions.slice(i, i + questionsPerPage)
-      const leftColumn = pageQuestions.slice(0, questionsPerColumn)
-      const rightColumn = pageQuestions.slice(questionsPerColumn)
+    while (currentIndex < questions.length) {
+      const remainingQuestions = questions.slice(currentIndex)
       
-      pages.push({
-        leftColumn,
-        rightColumn,
-        layoutType: 'two-column'
-      })
+      // Check if the first question in remaining questions is single-column
+      const firstQuestion = remainingQuestions[0]
+      const isSingleColumnPage = firstQuestion?.column_layout === 'single-column'
+      
+      if (isSingleColumnPage) {
+        // Handle single column page
+        const pageQuestions = remainingQuestions
+          .filter(q => q.column_layout === 'single-column')
+          .slice(0, singleColumnQuestionsPerPage)
+        
+        pages.push({
+          leftColumn: pageQuestions,
+          rightColumn: [],
+          layoutType: 'single-column'
+        })
+        
+        // Move index forward by the number of single-column questions we processed
+        const singleColumnCount = remainingQuestions
+          .slice(0, singleColumnQuestionsPerPage)
+          .filter(q => q.column_layout === 'single-column').length
+        currentIndex += singleColumnCount
+      } else {
+        // Handle two column page
+        const twoColumnQuestions = remainingQuestions
+          .filter(q => q.column_layout !== 'single-column')
+          .slice(0, questionsPerPage)
+        
+        const leftColumn = twoColumnQuestions.slice(0, leftColumnQuestions)
+        const rightColumn = twoColumnQuestions.slice(leftColumnQuestions, questionsPerPage)
+        
+        pages.push({
+          leftColumn,
+          rightColumn,
+          layoutType: 'two-column'
+        })
+        
+        // Move index forward by the number of two-column questions we processed
+        const twoColumnCount = remainingQuestions
+          .slice(0, questionsPerPage)
+          .filter(q => q.column_layout !== 'single-column').length
+        currentIndex += twoColumnCount
+      }
     }
     
     return pages
@@ -461,6 +493,7 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
             
             .question-item {
               margin-bottom: 8px !important;
+              margin-bottom: ${examSettings?.question_spacing || 0}px !important;
               page-break-inside: avoid;
               break-inside: avoid;
             }
@@ -507,7 +540,6 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                   display: grid;
                   grid-template-columns: repeat(2, minmax(0, 1fr));
                   gap: 3px;
-                  width: 50%;
             }
             
             .option-item {
@@ -598,6 +630,11 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                 <div className="question-column">
                   {page.leftColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
+                       {examSettings?.question_spacing && examSettings.question_spacing &&  examSettings.question_spacing==0 ? (
+                        <div style={{ height: `${examSettings.question_spacing}px` }}></div>
+                      ): <div style={{ height: `5px` }}></div>}
+                    </div>
+                  ))}
                       <div className="font-semibold mb-2 text-base leading-tight question-header">
                         {getBanglaNumber(question.order_index)}। {question.question_text}
                       </div>
@@ -621,12 +658,12 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                         </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                     
                 </div>
 
                 {/* Right Column */}
-                {page.layoutType === 'two-column' && <div className="question-column">
+                {page.layoutType === 'two-column' && page.rightColumn.length > 0 && (
+                  <div className="question-column">
                   {page.rightColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
                       <div className="font-semibold mb-2 text-base leading-tight question-header">
@@ -652,9 +689,13 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                         </div>
                         </div>
                       </div>
+                      {examSettings?.question_spacing && examSettings.question_spacing > <div></div> && (
+                        <div style={{ height: `${examSettings.question_spacing}px` }}></div>
+                      )}
                     </div>
-                  ))}
-                </div>}
+                  ))}  
+                  </div>
+                )}
               </div>
             </div>
           ))

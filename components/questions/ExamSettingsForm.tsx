@@ -29,6 +29,9 @@ const examSettingsSchema = z.object({
   margin_bottom: z.string().min(1, 'Bottom margin is required'),
   margin_left: z.string().min(1, 'Left margin is required'),
   margin_right: z.string().min(1, 'Right margin is required'),
+  question_spacing: z.number().min(0, 'Question spacing must be 0 or greater'),
+  left_column_questions: z.number().min(1, 'Left column must have at least 1 question'),
+  right_column_questions: z.number().min(1, 'Right column must have at least 1 question'),
 })
 
 type ExamSettingsFormData = z.infer<typeof examSettingsSchema>
@@ -64,6 +67,9 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
       margin_bottom: '1in',
       margin_left: '1in',
       margin_right: '1in',
+      question_spacing: 0,
+      left_column_questions: 10,
+      right_column_questions: 10,
     },
   })
 
@@ -106,6 +112,9 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
           margin_bottom: data.margins?.bottom ? `${data.margins.bottom}mm` : '25mm',
           margin_left: data.margins?.left ? `${data.margins.left}mm` : '25mm',
           margin_right: data.margins?.right ? `${data.margins.right}mm` : '25mm',
+          question_spacing: data.question_spacing || 0,
+          left_column_questions: data.left_column_questions || 10,
+          right_column_questions: data.right_column_questions || 10,
         }
         
         reset(settings)
@@ -184,6 +193,9 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
               page_size: data.page_size,
               margins: margins,
               header_info: preservedHeaderInfo,
+              question_spacing: data.question_spacing,
+              left_column_questions: data.left_column_questions,
+              right_column_questions: data.right_column_questions,
               updated_at: new Date().toISOString()
             })
             .eq('id', paper.id)
@@ -204,7 +216,10 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
             title: 'Default Settings',
             page_size: data.page_size,
             margins: margins,
-            header_info: headerInfo
+            header_info: headerInfo,
+            question_spacing: data.question_spacing,
+            left_column_questions: data.left_column_questions,
+            right_column_questions: data.right_column_questions
           })
 
         if (error) {
@@ -445,6 +460,63 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Question Layout Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">প্রশ্নের বিন্যাস</h3>
+            
+            <div className="space-y-2">
+              <Label htmlFor="question_spacing">প্রশ্নের মধ্যে ব্যবধান (পিক্সেল)</Label>
+              <Input
+                id="question_spacing"
+                type="number"
+                min="0"
+                max="50"
+                {...register('question_spacing', { valueAsNumber: true })}
+                placeholder="0"
+              />
+              {errors.question_spacing && (
+                <p className="text-sm text-red-500">{errors.question_spacing.message}</p>
+              )}
+              <p className="text-xs text-gray-500">প্রতিটি প্রশ্নের নিচে অতিরিক্ত স্থান যোগ করুন</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="left_column_questions">বাম কলামে প্রশ্ন সংখ্যা</Label>
+                <Input
+                  id="left_column_questions"
+                  type="number"
+                  min="1"
+                  max="20"
+                  {...register('left_column_questions', { valueAsNumber: true })}
+                  placeholder="10"
+                />
+                {errors.left_column_questions && (
+                  <p className="text-sm text-red-500">{errors.left_column_questions.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="right_column_questions">ডান কলামে প্রশ্ন সংখ্যা</Label>
+                <Input
+                  id="right_column_questions"
+                  type="number"
+                  min="1"
+                  max="20"
+                  {...register('right_column_questions', { valueAsNumber: true })}
+                  placeholder="10"
+                />
+                {errors.right_column_questions && (
+                  <p className="text-sm text-red-500">{errors.right_column_questions.message}</p>
+                )}
+              </div>
+            </div>
+            
+            <p className="text-xs text-gray-500">
+              প্রতি পৃষ্ঠায় কতটি প্রশ্ন দেখাতে হবে তা নির্ধারণ করুন। দুই কলাম লেআউটের জন্য প্রযোজ্য।
+            </p>
           </div>
 
           <Button type="submit" className="w-full" disabled={isLoading}>
