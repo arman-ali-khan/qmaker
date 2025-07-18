@@ -136,6 +136,7 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
           exam_time: data.exam_time,
           total_marks: data.total_marks,
           instructions: data.instructions,
+          subject: data.title.includes('Questions') ? data.title.replace(' Questions', '') : '',
         },
       };
 

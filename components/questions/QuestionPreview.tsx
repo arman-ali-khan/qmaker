@@ -22,6 +22,25 @@ const defaultSubjects = [
   'অর্থনীতি',
 ]
 
+interface ExamSettings {
+  id: string
+  user_id: string
+  title: string
+  school_name: string
+  school_address: string
+  exam_type: string
+  exam_time: string
+  total_marks: string
+  instructions: string
+  page_size: string
+  margins: {
+    top: number
+    bottom: number
+    left: number
+    right: number
+  }
+}
+
 interface Question {
   id: string
   paper_id: string
@@ -48,6 +67,7 @@ interface QuestionPreviewProps {
 export default function QuestionPreview({ user }: QuestionPreviewProps) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([])
+  const [examSettings, setExamSettings] = useState<ExamSettings | null>(null)
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [selectedSet, setSelectedSet] = useState<string>('')
   const [subjects, setSubjects] = useState<string[]>([])
@@ -60,8 +80,8 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
     documentTitle: `${selectedSubject || 'All'} - Questions`,
     pageStyle: `
       @page {
-        size: A4;
-        margin: 1in;
+        size: ${examSettings?.page_size || 'A4'};
+        margin: ${examSettings?.margins?.top || 25}mm ${examSettings?.margins?.right || 25}mm ${examSettings?.margins?.bottom || 25}mm ${examSettings?.margins?.left || 25}mm;
       }
       
       @media print {
@@ -87,12 +107,47 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
 
   useEffect(() => {
     fetchQuestions()
+    fetchExamSettings()
   }, [])
 
   useEffect(() => {
     filterQuestions()
   }, [questions, selectedSubject, selectedSet])
 
+  const fetchExamSettings = async () => {
+    try {
+      if (!user) return
+
+      // Get the first question paper for this user to get settings
+      const { data, error } = await supabase
+        .from('question_papers')
+        .select('*')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching exam settings:', error)
+      } else if (data) {
+        const settings: ExamSettings = {
+          id: data.id,
+          user_id: data.user_id,
+          title: data.title || 'Default Question Paper',
+          school_name: data.header_info?.school_name || 'বাংলাদেশ শিক্ষা বোর্ড',
+          school_address: data.header_info?.school_address || '',
+          exam_type: data.header_info?.exam_type || 'বার্ষিক পরীক্ষা',
+          exam_time: data.header_info?.exam_time || '২ ঘণ্টা ৩০ মিনিট',
+          total_marks: data.header_info?.total_marks || '১০০',
+          instructions: data.header_info?.instructions || 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
+          page_size: data.page_size || 'A4',
+          margins: data.margins || { top: 25, bottom: 25, left: 25, right: 25 }
+        }
+        setExamSettings(settings)
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
   const fetchQuestions = async () => {
     setIsLoading(true)
     try {
@@ -121,9 +176,11 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
         
         // Extract unique subjects and sets
         const uniqueSubjects = [...new Set((data || [])
-          .map(q => q.question_papers?.header_info?.subject)
+          .map(q => {
+            const subject = q.question_papers?.header_info?.subject
+            return subject && typeof subject === 'string' && subject.trim() !== '' ? subject : null
+          })
           .filter(Boolean)
-          .filter(subject => subject && subject.trim() !== '')
         )]
         const uniqueSets = [...new Set((data || [])
           .map(q => q.question_papers?.title)
@@ -151,7 +208,10 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
     let filtered = questions
 
     if (selectedSubject && selectedSubject !== 'all') {
-      filtered = filtered.filter(q => q.question_papers?.header_info?.subject === selectedSubject)
+      filtered = filtered.filter(q => {
+        const subject = q.question_papers?.header_info?.subject
+        return subject === selectedSubject
+      })
     }
 
     if (selectedSet && selectedSet !== 'all') {
@@ -293,8 +353,8 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
             }
             
             @page {
-              size: A4 !important;
-              margin: 1in !important;
+              size: ${examSettings?.page_size || 'A4'} !important;
+              margin: ${examSettings?.margins?.top || 25}mm ${examSettings?.margins?.right || 25}mm ${examSettings?.margins?.bottom || 25}mm ${examSettings?.margins?.left || 25}mm !important;
             }
             
             .print-page {
@@ -425,14 +485,17 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                 <div className="text-center mb-4 bengali-text avoid-break exam-header">
                   <div className="border-2 border-black p-4 mb-4">
                     <h1 className="text-xl font-bold mb-2 exam-title">
-                      বাংলাদেশ শিক্ষা বোর্ড
+                      {examSettings?.school_name || 'বাংলাদেশ শিক্ষা বোর্ড'}
                     </h1>
+                    {examSettings?.school_address && (
+                      <p className="text-sm mb-2">{examSettings.school_address}</p>
+                    )}
                     <h2 className="text-lg font-semibold mb-2 exam-subtitle">
-                      বার্ষিক পরীক্ষা - {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
+                      {examSettings?.exam_type || 'বার্ষিক পরীক্ষা'} - {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
                     </h2>
                     <div className="flex justify-between items-center text-sm">
-                      <span>সময়: ২ ঘণ্টা ৩০ মিনিট</span>
-                      <span>পূর্ণমান: ১০০</span>
+                      <span>সময়: {examSettings?.exam_time || '২ ঘণ্টা ৩০ মিনিট'}</span>
+                      <span>পূর্ণমান: {examSettings?.total_marks || '১০০'}</span>
                     </div>
                     {selectedSet && selectedSet !== 'all' && (
                       <div className="mt-2 text-sm">
@@ -447,7 +510,7 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
               {pageIndex === 0 && (
                 <div className="mb-3 bengali-text text-sm avoid-break exam-instructions">
                   <p className="mb-3">
-                    <strong>নির্দেশনা:</strong> প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।
+                    <strong>নির্দেশনা:</strong> {examSettings?.instructions || 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।'}
                   </p>
                 </div>
               )}

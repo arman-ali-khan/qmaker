@@ -155,7 +155,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
       const firstQuestion = questions[0]
       const paperTitle = firstQuestion.question_set || `${firstQuestion.subject} Questions`
       
-      let paperId: string
+      let paperId: string | null = null
       
       // Check if a paper with this title already exists
       const { data: existingPaper } = await supabase
@@ -192,6 +192,26 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
         }
         
         paperId = newPaper.id
+      }
+
+      // Update the question paper's header_info with the current subject if needed
+      if (paperId) {
+        const { error: updateError } = await supabase
+          .from('question_papers')
+          .update({
+            header_info: {
+              subject: firstQuestion.subject,
+              exam_type: 'MCQ',
+              total_marks: questions.length.toString(),
+              school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
+              exam_name: 'বার্ষিক পরীক্ষা'
+            }
+          })
+          .eq('id', paperId)
+        
+        if (updateError) {
+          console.error('Error updating question paper header:', updateError)
+        }
       }
 
       // Transform questions to new format
@@ -250,6 +270,26 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
     if (!editForm) return
 
     try {
+      // First, update the question paper's header_info with the new subject
+      const questionToUpdate = savedQuestions.find(q => q.id === editForm.id)
+      if (questionToUpdate?.paper_id) {
+        const { error: headerError } = await supabase
+          .from('question_papers')
+          .update({
+            header_info: {
+              subject: editForm.subject,
+              exam_type: 'MCQ',
+              school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
+              exam_name: 'বার্ষিক পরীক্ষা'
+            }
+          })
+          .eq('id', questionToUpdate.paper_id)
+        
+        if (headerError) {
+          console.error('Error updating question paper header:', headerError)
+        }
+      }
+
       const { error } = await supabase
         .from('questions')
         .update({
@@ -487,10 +527,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <div>
                           <Label>বিষয়</Label>
                           <Select 
-                            value={editForm?.subject || question.question_papers?.header_info?.subject || ''} 
+                            value={editForm?.subject || ''} 
                             onValueChange={(value) => {
                               setEditForm(prev => prev ? {...prev, subject: value} : null)
-                              // Also update the question paper's header_info if needed
                             }}
                           >
                             <SelectTrigger>
