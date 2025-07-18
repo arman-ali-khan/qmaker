@@ -9,50 +9,88 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { signIn, signUp } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
-const authSchema = z.object({
+const signInSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
-type AuthFormData = z.infer<typeof authSchema>
+const signUpSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
+  role: z.enum(['school_owner', 'teacher']),
+})
+
+type SignInFormData = z.infer<typeof signInSchema>
+type SignUpFormData = z.infer<typeof signUpSchema>
 
 export default function AuthForm() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<AuthFormData>({
-    resolver: zodResolver(authSchema),
+  const signInForm = useForm<SignInFormData>({
+    resolver: zodResolver(signInSchema),
   })
 
-  const handleAuth = async (data: AuthFormData, isSignUp: boolean) => {
+  const signUpForm = useForm<SignUpFormData>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      role: 'teacher'
+    }
+  })
+
+  const handleSignIn = async (data: SignInFormData) => {
     setIsLoading(true)
     try {
-      const { error } = isSignUp
-        ? await signUp(data.email, data.password)
-        : await signIn(data.email, data.password)
+      const { data: result, error } = await signIn(data.email, data.password)
+
+      if (error) {
+        toast.error(error.message)
+      } else if (result?.user) {
+        toast.success('Welcome back!')
+        router.push('/dashboard')
+      } else {
+        toast.error('Sign in failed')
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred')
+    } finally {
+      setIsLoading(false)
+      signInForm.reset()
+    }
+  }
+
+  const handleSignUp = async (data: SignUpFormData) => {
+    setIsLoading(true)
+    try {
+      const { data: result, error } = await signUp(data.email, data.password, data.fullName, data.role)
 
       if (error) {
         toast.error(error.message)
       } else {
-        toast.success(isSignUp ? 'Account created successfully!' : 'Welcome back!')
+        toast.success('Account created successfully!')
         router.push('/dashboard')
       }
     } catch (error) {
       toast.error('An unexpected error occurred')
     } finally {
       setIsLoading(false)
-      reset()
+      signUpForm.reset()
     }
   }
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setValue: setSignUpValue,
+  } = signUpForm
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -73,17 +111,17 @@ export default function AuthForm() {
             </TabsList>
             
             <TabsContent value="signin">
-              <form onSubmit={handleSubmit((data) => handleAuth(data, false))} className="space-y-4">
+              <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="teacher@school.edu.bd"
-                    {...register('email')}
+                    {...signInForm.register('email')}
                   />
-                  {errors.email && (
-                    <p className="text-sm text-red-500">{errors.email.message}</p>
+                  {signInForm.formState.errors.email && (
+                    <p className="text-sm text-red-500">{signInForm.formState.errors.email.message}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -92,10 +130,10 @@ export default function AuthForm() {
                     id="password"
                     type="password"
                     placeholder="Enter your password"
-                    {...register('password')}
+                    {...signInForm.register('password')}
                   />
-                  {errors.password && (
-                    <p className="text-sm text-red-500">{errors.password.message}</p>
+                  {signInForm.formState.errors.password && (
+                    <p className="text-sm text-red-500">{signInForm.formState.errors.password.message}</p>
                   )}
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
@@ -105,31 +143,62 @@ export default function AuthForm() {
             </TabsContent>
             
             <TabsContent value="signup">
-              <form onSubmit={handleSubmit((data) => handleAuth(data, true))} className="space-y-4">
+              <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Enter your full name"
+                    {...signUpForm.register('fullName')}
+                  />
+                  {signUpForm.formState.errors.fullName && (
+                    <p className="text-sm text-red-500">{signUpForm.formState.errors.fullName.message}</p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="teacher@school.edu.bd"
-                    {...register('email')}
+                    {...signUpForm.register('email')}
                   />
-                  {errors.email && (
-                    <p className="text-sm text-red-500">{errors.email.message}</p>
+                  {signUpForm.formState.errors.email && (
+                    <p className="text-sm text-red-500">{signUpForm.formState.errors.email.message}</p>
                   )}
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
                     type="password"
                     placeholder="Create a password"
-                    {...register('password')}
+                    {...signUpForm.register('password')}
                   />
-                  {errors.password && (
-                    <p className="text-sm text-red-500">{errors.password.message}</p>
+                  {signUpForm.formState.errors.password && (
+                    <p className="text-sm text-red-500">{signUpForm.formState.errors.password.message}</p>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select onValueChange={(value) => setSignUpValue('role', value as 'school_owner' | 'teacher')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="teacher">Teacher</SelectItem>
+                      <SelectItem value="school_owner">School Owner</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {signUpForm.formState.errors.role && (
+                    <p className="text-sm text-red-500">{signUpForm.formState.errors.role.message}</p>
+                  )}
+                </div>
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Creating account...' : 'Create Account'}
                 </Button>

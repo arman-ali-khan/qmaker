@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, User } from '@/lib/auth'
 import AuthForm from '@/components/auth/AuthForm'
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -16,16 +17,19 @@ export default function Home() {
 
   const checkAuth = async () => {
     try {
-      const user = await getCurrentUser()
-      if (user) {
+      const currentUser = await getCurrentUser()
+      if (currentUser) {
         setIsAuthenticated(true)
+        setUser(currentUser)
         router.push('/dashboard')
       } else {
         setIsAuthenticated(false)
+        setUser(null)
       }
     } catch (error) {
       console.error('Auth check error:', error)
       setIsAuthenticated(false)
+      setUser(null)
     } finally {
       setIsLoading(false)
     }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, User } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -28,7 +28,11 @@ interface Question {
   }
 }
 
-export default function QuestionPreview() {
+interface QuestionPreviewProps {
+  user: User | null
+}
+
+export default function QuestionPreview({ user }: QuestionPreviewProps) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([])
   const [selectedSubject, setSelectedSubject] = useState<string>('')
@@ -79,7 +83,6 @@ export default function QuestionPreview() {
   const fetchQuestions = async () => {
     setIsLoading(true)
     try {
-      const user = await getCurrentUser()
       if (!user) return
 
       // Get questions with their question papers
@@ -158,6 +161,16 @@ export default function QuestionPreview() {
 
   const questionPages = splitQuestionsIntoPages(filteredQuestions)
 
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <p className="text-gray-500">Please sign in to view questions</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -171,6 +184,9 @@ export default function QuestionPreview() {
       <Card className="no-print">
         <CardHeader>
           <CardTitle className="text-xl font-semibold">প্রশ্ন প্রিভিউ ও প্রিন্ট</CardTitle>
+          <p className="text-sm text-gray-600">
+            Viewing questions for: {user.full_name} ({user.role})
+          </p>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4 mb-4">

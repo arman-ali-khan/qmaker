@@ -16,6 +16,44 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
 export type Database = {
   public: {
     Tables: {
+      users: {
+        Row: {
+          id: string
+          email: string
+          role: 'school_owner' | 'teacher'
+          school_id: string | null
+          full_name: string
+          subject: string | null
+          qualification: string | null
+          experience: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          role: 'school_owner' | 'teacher'
+          school_id?: string | null
+          full_name: string
+          subject?: string | null
+          qualification?: string | null
+          experience?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          role?: 'school_owner' | 'teacher'
+          school_id?: string | null
+          full_name?: string
+          subject?: string | null
+          qualification?: string | null
+          experience?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       question_papers: {
         Row: {
           id: string

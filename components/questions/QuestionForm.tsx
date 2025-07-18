@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { supabase } from '@/lib/supabase'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, User } from '@/lib/auth'
 import { toast } from 'sonner'
 import { Plus, Trash2, Edit, Save, X } from 'lucide-react'
 
@@ -45,6 +45,7 @@ const subjects = [
 
 interface QuestionFormProps {
   onQuestionAdded: () => void
+  user: User | null
 }
 
 interface SavedQuestion {
@@ -64,7 +65,7 @@ interface SavedQuestion {
   }
 }
 
-export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
+export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [questions, setQuestions] = useState<QuestionFormData[]>([])
   const [savedQuestions, setSavedQuestions] = useState<SavedQuestion[]>([])
@@ -93,7 +94,6 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
   const fetchSavedQuestions = async () => {
     setIsLoadingSaved(true)
     try {
-      const user = await getCurrentUser()
       if (!user) return
 
       // Get questions with their question papers
@@ -146,7 +146,6 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
 
     setIsLoading(true)
     try {
-      const user = await getCurrentUser()
       if (!user) {
         toast.error('Please sign in to save questions')
         return
@@ -164,7 +163,7 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
         .select('id')
         .eq('user_id', user.id)
         .eq('title', paperTitle)
-        .single()
+        .maybeSingle()
       
       if (existingPaper) {
         paperId = existingPaper.id
@@ -298,11 +297,24 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
     }
   }
 
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <p className="text-gray-500">Please sign in to create questions</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl font-semibold">নতুন প্রশ্ন যোগ করুন</CardTitle>
+          <p className="text-sm text-gray-600">
+            Logged in as: {user.full_name} ({user.role})
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(addQuestion)} className="space-y-4">

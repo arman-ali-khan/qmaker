@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentUser, signOut } from '@/lib/auth'
+import { getCurrentUser, signOut, User } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -13,7 +13,7 @@ import QuestionPreview from '@/components/questions/QuestionPreview'
 import ExamSettingsForm from '@/components/questions/ExamSettingsForm'
 
 export default function DashboardLayout() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const router = useRouter()
@@ -73,9 +73,14 @@ export default function DashboardLayout() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                Welcome, {user?.email}
-              </span>
+              <div className="text-right">
+                <span className="text-sm text-gray-600">
+                  Welcome, {user?.full_name}
+                </span>
+                <div className="text-xs text-gray-500">
+                  {user?.role === 'school_owner' ? 'School Owner' : 'Teacher'} • {user?.email}
+                </div>
+              </div>
               <Button variant="outline" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
@@ -103,15 +108,15 @@ export default function DashboardLayout() {
           </TabsList>
 
           <TabsContent value="create" className="mt-6">
-            <QuestionForm onQuestionAdded={handleQuestionAdded} />
+            <QuestionForm onQuestionAdded={handleQuestionAdded} user={user} />
           </TabsContent>
 
           <TabsContent value="preview" className="mt-6">
-            <QuestionPreview key={refreshKey} />
+            <QuestionPreview key={refreshKey} user={user} />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
-            <ExamSettingsForm onSettingsUpdated={handleQuestionAdded} />
+            <ExamSettingsForm onSettingsUpdated={handleQuestionAdded} user={user} />
           </TabsContent>
         </Tabs>
       </main>

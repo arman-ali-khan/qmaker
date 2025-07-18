@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, User } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,9 +34,10 @@ type ExamSettingsFormData = z.infer<typeof examSettingsSchema>;
 
 interface ExamSettingsFormProps {
   onSettingsUpdated: () => void;
+  user: User | null;
 }
 
-export default function ExamSettingsForm({ onSettingsUpdated }: ExamSettingsFormProps) {
+export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettingsFormProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [questionPaperId, setQuestionPaperId] = useState<string | null>(null);
@@ -73,7 +74,6 @@ export default function ExamSettingsForm({ onSettingsUpdated }: ExamSettingsForm
   const loadQuestionPaper = async () => {
     setIsLoading(true);
     try {
-      const user = await getCurrentUser();
       if (!user) return;
 
       // Get the first question paper for this user, or create a default one
@@ -114,7 +114,6 @@ export default function ExamSettingsForm({ onSettingsUpdated }: ExamSettingsForm
   const onSubmit = async (data: ExamSettingsFormData) => {
     setIsSaving(true);
     try {
-      const user = await getCurrentUser();
       if (!user) {
         toast.error('Please sign in to save settings');
         return;
@@ -176,6 +175,16 @@ export default function ExamSettingsForm({ onSettingsUpdated }: ExamSettingsForm
     }
   };
 
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <p className="text-gray-500">Please sign in to manage settings</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -194,6 +203,9 @@ export default function ExamSettingsForm({ onSettingsUpdated }: ExamSettingsForm
         <CardDescription>
           পরীক্ষার কাগজের জন্য প্রয়োজনীয় তথ্য এবং ফরম্যাটিং সেটিংস কনফিগার করুন
         </CardDescription>
+        <p className="text-sm text-gray-600">
+          Settings for: {user.full_name} ({user.role})
+        </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
