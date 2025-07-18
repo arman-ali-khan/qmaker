@@ -20,6 +20,9 @@ interface ExamSettings {
   total_marks: string
   instructions: string
   page_size: string
+  font_size: string
+  font_family: string
+  options_font_size: string
   margins: {
     top: number
     bottom: number
@@ -171,6 +174,9 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
           total_marks: data.header_info?.total_marks || '১০০',
           instructions: data.header_info?.instructions || 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
           page_size: data.page_size || 'A4',
+          font_size: data.font_size || '14px',
+          font_family: data.font_family || 'noto-serif',
+          options_font_size: data.options_font_size || '12px',
           margins: data.margins || { top: 25, bottom: 25, left: 25, right: 25 },
           question_spacing: data.question_spacing || 0,
           left_column_questions: data.left_column_questions || 10,
@@ -191,6 +197,9 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
           total_marks: '১০০',
           instructions: 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
           page_size: 'A4',
+          font_size: '14px',
+          font_family: 'noto-serif',
+          options_font_size: '12px',
           margins: { top: 25, bottom: 25, left: 25, right: 25 },
           question_spacing: 0,
           left_column_questions: 10,
@@ -418,7 +427,7 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
           
           .bengali-text {
             font-family: 'Noto Serif Bengali', serif;
-            font-size: 14px;
+            font-size: ${examSettings?.font_size || '14px'};
             line-height: 1.5;
           }
           
@@ -474,19 +483,20 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
             
             .bengali-text {
               font-family: 'Noto Serif Bengali', serif !important;
-              font-size: 11px !important;
+              font-size: ${examSettings?.font_size ? `calc(${examSettings.font_size} * 0.8)` : '11px'} !important;
               line-height: 1.3 !important;
             }
             
             .question-header {
-              font-size: 12px !important;
+              font-size: ${examSettings?.font_size ? `calc(${examSettings.font_size} * 0.9)` : '12px'} !important;
               margin-bottom: 4px !important;
               line-height: 1.3 !important;
               font-weight: 600 !important;
             }
             
             .question-options {
-              font-size: 10px !important;
+              font-size: ${examSettings?.font_size ? `calc(${examSettings.font_size} * 0.75)` : '10px'} !important;
+              font-size: ${examSettings?.options_font_size || '12px'} !important;
               line-height: 1.2 !important;
               margin-left: 8px !important;
             }
@@ -499,29 +509,29 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
             }
             
             .exam-header {
-              font-size: 14px !important;
+              font-size: ${examSettings?.font_size || '14px'} !important;
               margin-bottom: 10px !important;
             }
             
             .exam-title {
-              font-size: 16px !important;
+              font-size: ${examSettings?.font_size ? `calc(${examSettings.font_size} * 1.2)` : '16px'} !important;
               margin-bottom: 6px !important;
               font-weight: 700 !important;
             }
             
             .exam-subtitle {
-              font-size: 14px !important;
+              font-size: ${examSettings?.font_size ? `calc(${examSettings.font_size} * 1.2)` : '16px'} !important;
               margin-bottom: 6px !important;
               font-weight: 600 !important;
             }
             
             .exam-instructions {
-              font-size: 10px !important;
+              font-size: ${examSettings?.font_size ? `calc(${examSettings.font_size} * 0.75)` : '10px'} !important;
               margin-bottom: 8px !important;
             }
             
             .question-columns {
-              gap: 16px !important;
+              gap: 33px !important;
               display: grid !important;
               grid-template-columns: var(--columns) !important;
             }
@@ -546,6 +556,8 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
               display: flex !important;
               align-items: flex-start !important;
               gap: 6px !important;
+              font-size: ${examSettings?.font_size ? `calc(${examSettings.font_size} * 0.75)` : '10px'} !important;
+              font-size: ${examSettings?.options_font_size || '12px'} !important;
             }
             
             .option-label {
@@ -630,15 +642,10 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                 <div className="question-column">
                   {page.leftColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
-                       {examSettings?.question_spacing && examSettings.question_spacing &&  examSettings.question_spacing==0 ? (
-                        <div style={{ height: `${examSettings.question_spacing}px` }}></div>
-                      ): <div style={{ height: `5px` }}></div>}
-                    </div>
-                  ))}
                       <div className="font-semibold mb-2 text-base leading-tight question-header">
                         {getBanglaNumber(question.order_index)}। {question.question_text}
                       </div>
-                      <div className="text-sm question-options">
+                      <div className="question-options">
                         <div className="option-grid">
                         <div className="option-item">
                           <span className="option-label">ক)</span>
@@ -658,7 +665,13 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                         </div>
                         </div>
                       </div>
-                     
+                      {examSettings?.question_spacing && examSettings.question_spacing > 0 ? (
+                        <div style={{ height: `${examSettings.question_spacing}px` }}></div>
+                      ) : (
+                        <div style={{ height: `5px` }}></div>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Right Column */}
@@ -689,8 +702,10 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                         </div>
                         </div>
                       </div>
-                      {examSettings?.question_spacing && examSettings.question_spacing > <div></div> && (
+                      {examSettings?.question_spacing && examSettings.question_spacing > 0 ? (
                         <div style={{ height: `${examSettings.question_spacing}px` }}></div>
+                      ) : (
+                        <div style={{ height: `5px` }}></div>
                       )}
                     </div>
                   ))}  

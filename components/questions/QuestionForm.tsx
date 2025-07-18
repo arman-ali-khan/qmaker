@@ -26,7 +26,7 @@ const questionSchema = z.object({
   option_d: z.string().min(1, 'Option D is required'),
   correct_answer: z.enum(['A', 'B', 'C', 'D']),
   question_set: z.string().optional(),
-  column_layout: z.enum(['single-column', 'two-column']).default('two-column'),
+  column_layout: z.enum(["single-column", "two-column"]).optional(),
 })
 
 type QuestionFormData = z.infer<typeof questionSchema>
@@ -645,7 +645,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                           <Select 
                             value={editForm?.subject || 'বাংলা'} 
                             onValueChange={(value) => {
-                              setEditForm(prev => prev ? {...prev, subject: value} : null)
+                              setEditForm((prev: QuestionFormData | null) => 
+  prev ? { ...prev, subject: value } : null
+)
                             }}
                           >
                             <SelectTrigger>
@@ -665,7 +667,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                           <Input
                             type="number"
                             value={editForm?.question_no || ''}
-                            onChange={(e) => setEditForm(prev => prev ? {...prev, question_no: parseInt(e.target.value)} : null)}
+                           onChange={(e) => setEditForm((prev: QuestionFormData | null) => 
+  prev ? { ...prev, subject: e.target.value } : null
+)}
                           />
                         </div>
                       </div>
@@ -674,7 +678,12 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <Label>প্রশ্নের সেট</Label>
                         <Input
                           value={editForm?.question_set || ''}
-                          onChange={(e) => setEditForm(prev => prev ? {...prev, question_set: e.target.value} : null)}
+                          onChange={(e) =>
+  setEditForm((prev: QuestionFormData | null) =>
+    prev ? { ...prev, question_set: e.target.value } : null
+  )
+}
+
                         />
                       </div>
                       
@@ -682,7 +691,12 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <Label>প্রদর্শন বিন্যাস</Label>
                         <RadioGroup
                           value={editForm?.column_layout || 'two-column'}
-                          onValueChange={(value) => setEditForm(prev => prev ? {...prev, column_layout: value} : null)}
+                         onValueChange={(value) => 
+  setEditForm((prev: QuestionFormData | null) => 
+    prev ? { ...prev, column_layout: value } : null
+  )
+}
+
                         >
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="single-column" id="edit_single_column" />
@@ -699,7 +713,10 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <Label>প্রশ্ন</Label>
                         <Textarea
                           value={editForm?.question_text || ''}
-                          onChange={(e) => setEditForm(prev => prev ? {...prev, question_text: e.target.value} : null)}
+                          onChange={(e) => setEditForm((prev: QuestionFormData | null) => 
+  prev ? { ...prev, question_text: e.target.value } : null
+)}
+
                           rows={3}
                         />
                       </div>
@@ -709,28 +726,32 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                           <Label>বিকল্প (ক)</Label>
                           <Input
                             value={editForm?.option_a || ''}
-                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_a: e.target.value} : null)}
+                            onChange={(e) => setEditForm((prev: QuestionFormData | null) => 
+  prev ? { ...prev, option_a: e.target.value } : null
+)}
                           />
                         </div>
                         <div>
                           <Label>বিকল্প (খ)</Label>
                           <Input
                             value={editForm?.option_b || ''}
-                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_b: e.target.value} : null)}
+                            onChange={(e) => setEditForm((prev: QuestionFormData | null) => 
+  prev ? { ...prev, option_b: e.target.value } : null
+)}
                           />
                         </div>
                         <div>
                           <Label>বিকল্প (গ)</Label>
                           <Input
                             value={editForm?.option_c || ''}
-                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_c: e.target.value} : null)}
+                            onChange={(e) => setEditForm(((prev: QuestionFormData | null) => prev ? {...prev, option_c: e.target.value} : null)}
                           />
                         </div>
                         <div>
                           <Label>বিকল্প (ঘ)</Label>
                           <Input
                             value={editForm?.option_d || ''}
-                            onChange={(e) => setEditForm(prev => prev ? {...prev, option_d: e.target.value} : null)}
+                            onChange={(e) => setEditForm(((prev: QuestionFormData | null) => prev ? {...prev, option_d: e.target.value} : null)}
                           />
                         </div>
                       </div>
@@ -739,7 +760,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <Label>সঠিক উত্তর</Label>
                         <RadioGroup
                           value={editForm?.correct_answer || ''}
-                          onValueChange={(value) => setEditForm(prev => prev ? {...prev, correct_answer: value} : null)}
+                          onValueChange={(value) => setEditForm(((prev: QuestionFormData | null) => prev ? {...prev, correct_answer: value} : null)}
                         >
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="A" id="edit_correct_a" />

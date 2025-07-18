@@ -25,6 +25,7 @@ const examSettingsSchema = z.object({
   page_size: z.string().min(1, 'Page size is required'),
   font_family: z.string().min(1, 'Font family is required'),
   font_size: z.string().min(1, 'Font size is required'),
+  options_font_size: z.string().min(1, 'Options font size is required'),
   margin_top: z.string().min(1, 'Top margin is required'),
   margin_bottom: z.string().min(1, 'Bottom margin is required'),
   margin_left: z.string().min(1, 'Left margin is required'),
@@ -51,6 +52,7 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
     formState: { errors },
     reset,
     setValue,
+    watch,
   } = useForm<ExamSettingsFormData>({
     resolver: zodResolver(examSettingsSchema),
     defaultValues: {
@@ -63,6 +65,7 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
       page_size: 'A4',
       font_family: 'noto-serif',
       font_size: '14px',
+      options_font_size: '12px',
       margin_top: '1in',
       margin_bottom: '1in',
       margin_left: '1in',
@@ -106,8 +109,9 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
           total_marks: data.header_info?.total_marks || '১০০',
           instructions: data.header_info?.instructions || 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
           page_size: data.page_size || 'A4',
-          font_family: 'noto-serif',
-          font_size: '14px',
+          font_family: data.font_family || 'noto-serif',
+          font_size: data.font_size || '14px',
+          options_font_size: data.options_font_size || '12px',
           margin_top: data.margins?.top ? `${data.margins.top}mm` : '25mm',
           margin_bottom: data.margins?.bottom ? `${data.margins.bottom}mm` : '25mm',
           margin_left: data.margins?.left ? `${data.margins.left}mm` : '25mm',
@@ -184,18 +188,21 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
           const preservedHeaderInfo = {
             ...headerInfo,
             // Preserve the existing subject if it exists
-            subject: paper.header_info?.subject || headerInfo.subject || ''
+            subject: paper.header_info?.subject || ''
           }
 
           const { error: updateError } = await supabase
             .from('question_papers')
-            .update({
+            .update({ 
               page_size: data.page_size,
               margins: margins,
               header_info: preservedHeaderInfo,
               question_spacing: data.question_spacing,
               left_column_questions: data.left_column_questions,
               right_column_questions: data.right_column_questions,
+              font_size: data.font_size,
+              font_family: data.font_family,
+              options_font_size: data.options_font_size, 
               updated_at: new Date().toISOString()
             })
             .eq('id', paper.id)
@@ -219,7 +226,10 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
             header_info: headerInfo,
             question_spacing: data.question_spacing,
             left_column_questions: data.left_column_questions,
-            right_column_questions: data.right_column_questions
+            right_column_questions: data.right_column_questions,
+            font_size: data.font_size,
+            font_family: data.font_family,
+            options_font_size: data.options_font_size
           })
 
         if (error) {
@@ -378,7 +388,10 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
 
               <div className="space-y-2">
                 <Label htmlFor="font_family">ফন্ট</Label>
-                <Select onValueChange={(value) => setValue('font_family', value)}>
+                <Select 
+                  value={watch('font_family')} 
+                  onValueChange={(value) => setValue('font_family', value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="ফন্ট নির্বাচন করুন" />
                   </SelectTrigger>
@@ -394,7 +407,9 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
               </div>
             </div>
 
-            <div className="space-y-2">
+           {/* Font Size and option font size */}
+            <div className="flex w-full gap-3">
+             <div className="space-y-2 w-full">
               <Label htmlFor="font_size">ফন্ট সাইজ</Label>
               <Input
                 id="font_size"
@@ -405,8 +420,22 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
                 <p className="text-sm text-red-500">{errors.font_size.message}</p>
               )}
             </div>
+
+            <div className="space-y-2 w-full">
+              <Label htmlFor="options_font_size">প্রশ্নের অপশন ফন্ট সাইজ</Label>
+              <Input
+                id="options_font_size"
+                {...register('options_font_size')}
+                placeholder="12px"
+              />
+              {errors.options_font_size && (
+                <p className="text-sm text-red-500">{errors.options_font_size.message}</p>
+              )}
+              <p className="text-xs text-gray-500">প্রশ্নের অপশন (ক, খ, গ, ঘ) এর জন্য আলাদা ফন্ট সাইজ</p>
+            </div>
           </div>
 
+          </div>
           {/* Margins */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">মার্জিন</h3>
