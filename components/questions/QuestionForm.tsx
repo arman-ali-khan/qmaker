@@ -30,22 +30,14 @@ const questionSchema = z.object({
 
 type QuestionFormData = z.infer<typeof questionSchema>
 
-const subjects = [
-  'বাংলা',
-  'ইংরেজি',
-  'গণিত',
-  'পদার্থবিজ্ঞান',
-  'রসায়ন',
-  'জীববিজ্ঞান',
-  'ইতিহাস',
-  'ভূগোল',
-  'সমাজবিজ্ঞান',
-  'অর্থনীতি',
-]
-
 interface QuestionFormProps {
   onQuestionAdded: () => void
   user: User | null
+}
+
+interface Subject {
+  id: string
+  name: string
 }
 
 interface SavedQuestion {
@@ -67,8 +59,10 @@ interface SavedQuestion {
 
 export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const [questions, setQuestions] = useState<QuestionFormData[]>([])
   const [savedQuestions, setSavedQuestions] = useState<SavedQuestion[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [newSubject, setNewSubject] = useState('')
+  const [isAddingSubject, setIsAddingSubject] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<any>(null)
   const [isLoadingSaved, setIsLoadingSaved] = useState(true)
@@ -89,7 +83,60 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
 
   useEffect(() => {
     fetchSavedQuestions()
+    fetchSubjects()
   }, [])
+
+  const fetchSubjects = async () => {
+    try {
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name')
+
+      if (error) {
+        console.error('Error fetching subjects:', error)
+      } else {
+        setSubjects(data || [])
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const addNewSubject = async () => {
+    if (!newSubject.trim() || !user) return
+
+    setIsAddingSubject(true)
+    try {
+      const { data, error } = await supabase
+        .from('subjects')
+        .insert({
+          user_id: user.id,
+          name: newSubject.trim()
+        })
+        .select()
+        .single()
+
+      if (error) {
+        if (error.code === '23505') { // Unique constraint violation
+          toast.error('This subject already exists')
+        } else {
+          toast.error('Failed to add subject')
+        }
+      } else {
+        setSubjects(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+        setNewSubject('')
+        toast.success('Subject added successfully')
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred')
+    } finally {
+      setIsAddingSubject(false)
+    }
+  }
 
   const fetchSavedQuestions = async () => {
     setIsLoadingSaved(true)
@@ -124,26 +171,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
     }
   }
 
-  const addQuestion = (data: QuestionFormData) => {
-    setQuestions([...questions, data])
-    reset({
-      subject: data.subject,
-      question_set: data.question_set,
-      question_no: data.question_no + 1,
-    })
-    toast.success('Question added to set')
-  }
-
-  const removeQuestion = (index: number) => {
-    setQuestions(questions.filter((_, i) => i !== index))
-  }
-
-  const saveAllQuestions = async () => {
-    if (questions.length === 0) {
-      toast.error('Please add at least one question')
-      return
-    }
-
+  const saveQuestion = async (data: QuestionFormData) => {
     setIsLoading(true)
     try {
       if (!user) {
@@ -152,8 +180,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
       }
 
       // Create or find a question paper for this set
-      const firstQuestion = questions[0]
-      const paperTitle = firstQuestion.question_set || `${firstQuestion.subject} Questions`
+      const paperTitle = data.question_set || `${data.subject} Questions`
       
       let paperId: string | null = null
       
@@ -175,9 +202,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
             user_id: user.id,
             title: paperTitle,
             header_info: {
-              subject: firstQuestion.subject,
+              subject: data.subject,
               exam_type: 'MCQ',
-              total_marks: questions.length.toString(),
+              total_marks: '100',
               school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
               exam_name: 'বার্ষিক পরীক্ষা'
             }
@@ -200,9 +227,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
           .from('question_papers')
           .update({
             header_info: {
-              subject: firstQuestion.subject,
+              subject: data.subject,
               exam_type: 'MCQ',
-              total_marks: questions.length.toString(),
+              total_marks: '100',
               school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
               exam_name: 'বার্ষিক পরীক্ষা'
             }
@@ -214,27 +241,31 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
         }
       }
 
-      // Transform questions to new format
-      const questionsToSave = questions.map((q, index) => ({
+      // Transform question to new format
+      const questionToSave = {
         paper_id: paperId,
         type: 'mcq',
-        question_text: q.question_text,
-        options: [q.option_a, q.option_b, q.option_c, q.option_d],
-        correct_answer: q.correct_answer,
+        question_text: data.question_text,
+        options: [data.option_a, data.option_b, data.option_c, data.option_d],
+        correct_answer: data.correct_answer,
         marks: 1,
-        order_index: q.question_no
-      }))
+        order_index: data.question_no
+      }
 
       const { error } = await supabase
         .from('questions')
-        .insert(questionsToSave)
+        .insert(questionToSave)
 
       if (error) {
-        toast.error('Failed to save questions')
+        toast.error('Failed to save question')
         console.error(error)
       } else {
-        toast.success(`${questions.length} question(s) saved successfully!`)
-        setQuestions([])
+        toast.success('Question saved successfully!')
+        reset({
+          subject: data.subject,
+          question_set: data.question_set,
+          question_no: data.question_no + 1,
+        })
         fetchSavedQuestions() // Refresh the saved questions list
         onQuestionAdded()
       }
@@ -359,22 +390,47 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
           </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(addQuestion)} className="space-y-4">
+          <form onSubmit={handleSubmit(saveQuestion)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="subject">বিষয়</Label>
-                <Select onValueChange={(value) => setValue('subject', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="বিষয় নির্বাচন করুন" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subjects.map((subject) => (
-                      <SelectItem key={subject} value={subject}>
-                        {subject}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Select onValueChange={(value) => setValue('subject', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="বিষয় নির্বাচন করুন" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map((subject) => (
+                        <SelectItem key={subject.id} value={subject.name}>
+                          {subject.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Add new subject */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="নতুন বিষয় যোগ করুন"
+                      value={newSubject}
+                      onChange={(e) => setNewSubject(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addNewSubject()
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addNewSubject}
+                      disabled={isAddingSubject || !newSubject.trim()}
+                    >
+                      {isAddingSubject ? 'যোগ করা হচ্ছে...' : 'যোগ করুন'}
+                    </Button>
+                  </div>
+                </div>
                 {errors.subject && (
                   <p className="text-sm text-red-500">{errors.subject.message}</p>
                 )}
@@ -492,9 +548,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
               )}
             </div>
 
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={isLoading}>
               <Plus className="w-4 h-4 mr-2" />
-              প্রশ্ন যোগ করুন
+              {isLoading ? 'সেভ করা হচ্ছে...' : 'প্রশ্ন সেভ করুন'}
             </Button>
           </form>
         </CardContent>
@@ -537,8 +593,8 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                             </SelectTrigger>
                             <SelectContent>
                               {subjects.map((subject) => (
-                                <SelectItem key={subject} value={subject}>
-                                  {subject}
+                                <SelectItem key={subject.id} value={subject.name}>
+                                  {subject.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -700,51 +756,6 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
         </CardContent>
       </Card>
 
-      {questions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold">
-              প্রশ্নের তালিকা ({questions.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {questions.map((question, index) => (
-                <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium">
-                      {question.question_no}. {question.question_text}
-                    </h3>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeQuestion(index)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>ক) {question.option_a}</div>
-                    <div>খ) {question.option_b}</div>
-                    <div>গ) {question.option_c}</div>
-                    <div>ঘ) {question.option_d}</div>
-                  </div>
-                  <div className="mt-2 text-sm text-green-600">
-                    সঠিক উত্তর: {question.correct_answer}
-                  </div>
-                </div>
-              ))}
-              <Button
-                onClick={saveAllQuestions}
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? 'সেভ করা হচ্ছে...' : 'সব প্রশ্ন সেভ করুন'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

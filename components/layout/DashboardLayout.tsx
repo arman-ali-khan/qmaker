@@ -52,6 +52,10 @@ export default function DashboardLayout() {
     setRefreshKey(prev => prev + 1)
   }
 
+  const handleSettingsUpdated = () => {
+    setRefreshKey(prev => prev + 1)
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -112,11 +116,11 @@ export default function DashboardLayout() {
           </TabsContent>
 
           <TabsContent value="preview" className="mt-6">
-            <QuestionPreview key={refreshKey} user={user} />
+            <QuestionPreview key={`preview-${refreshKey}`} user={user} />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
-            <ExamSettingsForm onSettingsUpdated={handleQuestionAdded} user={user} />
+            <ExamSettingsForm key={`settings-${refreshKey}`} onSettingsUpdated={handleSettingsUpdated} user={user} />
           </TabsContent>
         </Tabs>
       </main>

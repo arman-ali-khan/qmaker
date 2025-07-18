@@ -9,19 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Printer, Download } from 'lucide-react'
 import { useReactToPrint } from 'react-to-print'
 
-const defaultSubjects = [
-  'বাংলা',
-  'ইংরেজি',
-  'গণিত',
-  'পদার্থবিজ্ঞান',
-  'রসায়ন',
-  'জীববিজ্ঞান',
-  'ইতিহাস',
-  'ভূগোল',
-  'সমাজবিজ্ঞান',
-  'অর্থনীতি',
-]
-
 interface ExamSettings {
   id: string
   user_id: string
@@ -39,6 +26,11 @@ interface ExamSettings {
     left: number
     right: number
   }
+}
+
+interface Subject {
+  id: string
+  name: string
 }
 
 interface Question {
@@ -62,6 +54,7 @@ interface Question {
 
 interface QuestionPreviewProps {
   user: User | null
+  key?: string
 }
 
 export default function QuestionPreview({ user }: QuestionPreviewProps) {
@@ -70,9 +63,10 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
   const [examSettings, setExamSettings] = useState<ExamSettings | null>(null)
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [selectedSet, setSelectedSet] = useState<string>('')
-  const [subjects, setSubjects] = useState<string[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
   const [questionSets, setQuestionSets] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [settingsLoading, setSettingsLoading] = useState(true)
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = useReactToPrint({
@@ -108,27 +102,60 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
   useEffect(() => {
     fetchQuestions()
     fetchExamSettings()
+    fetchSubjects()
   }, [])
+
+  useEffect(() => {
+    // Refetch settings when user changes
+    if (user) {
+      fetchExamSettings()
+    }
+  }, [user])
 
   useEffect(() => {
     filterQuestions()
   }, [questions, selectedSubject, selectedSet])
 
-  const fetchExamSettings = async () => {
+  const fetchSubjects = async () => {
     try {
       if (!user) return
 
-      // Get the first question paper for this user to get settings
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name')
+
+      if (error) {
+        console.error('Error fetching subjects:', error)
+      } else {
+        setSubjects(data || [])
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }
+
+  const fetchExamSettings = async () => {
+    setSettingsLoading(true)
+    try {
+      if (!user) return
+
+      console.log('Fetching exam settings for user:', user.id)
+      
+      // Get the most recent question paper for this user to get settings
       const { data, error } = await supabase
         .from('question_papers')
         .select('*')
         .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching exam settings:', error)
       } else if (data) {
+        console.log('Loaded exam settings:', data)
         const settings: ExamSettings = {
           id: data.id,
           user_id: data.user_id,
@@ -143,9 +170,28 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
           margins: data.margins || { top: 25, bottom: 25, left: 25, right: 25 }
         }
         setExamSettings(settings)
+      } else {
+        console.log('No question paper found, using default settings')
+        // Set default settings if no question paper exists
+        const defaultSettings: ExamSettings = {
+          id: '',
+          user_id: user.id,
+          title: 'Default Question Paper',
+          school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
+          school_address: '',
+          exam_type: 'বার্ষিক পরীক্ষা',
+          exam_time: '২ ঘণ্টা ৩০ মিনিট',
+          total_marks: '১০০',
+          instructions: 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
+          page_size: 'A4',
+          margins: { top: 25, bottom: 25, left: 25, right: 25 }
+        }
+        setExamSettings(defaultSettings)
       }
     } catch (error) {
       console.error('Error:', error)
+    } finally {
+      setSettingsLoading(false)
     }
   }
   const fetchQuestions = async () => {
@@ -174,31 +220,19 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
       } else {
         setQuestions(data || [])
         
-        // Extract unique subjects and sets
-        const uniqueSubjects = [...new Set((data || [])
-          .map(q => {
-            const subject = q.question_papers?.header_info?.subject
-            return subject && typeof subject === 'string' && subject.trim() !== '' ? subject : null
-          })
-          .filter(Boolean)
-        )]
+        // Extract unique sets
         const uniqueSets = [...new Set((data || [])
           .map(q => q.question_papers?.title)
           .filter(Boolean)
           .filter(title => title && title.trim() !== '')
         )]
         
-        console.log('Unique subjects found:', uniqueSubjects)
         console.log('Unique sets found:', uniqueSets)
         
-        // Use found subjects or fall back to default subjects if none found
-        setSubjects(uniqueSubjects.length > 0 ? uniqueSubjects : defaultSubjects)
         setQuestionSets(uniqueSets)
       }
     } catch (error) {
       console.error('Error:', error)
-      // Set default subjects on error
-      setSubjects(defaultSubjects)
     } finally {
       setIsLoading(false)
     }
@@ -262,6 +296,16 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2">Loading questions...</span>
+      </div>
+    )
+  }
+
+  if (settingsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2">Loading settings...</span>
       </div>
     )
   }
@@ -274,6 +318,11 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
           <p className="text-sm text-gray-600">
             Viewing questions for: {user.full_name} ({user.role})
           </p>
+          {examSettings && (
+            <p className="text-xs text-gray-500">
+              Settings: {examSettings.school_name} - {examSettings.exam_type}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -284,8 +333,8 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
               <SelectContent>
                 <SelectItem value="all">সব বিষয়</SelectItem>
                 {subjects.map((subject) => (
-                  <SelectItem key={subject} value={subject}>
-                    {subject}
+                  <SelectItem key={subject.id} value={subject.name}>
+                    {subject.name}
                   </SelectItem>
                 ))}
               </SelectContent>
