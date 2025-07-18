@@ -9,34 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Printer, Download } from 'lucide-react'
 import { useReactToPrint } from 'react-to-print'
 
-interface ExamSettings {
-  school_name: string
-  school_address: string
-  exam_type: string
-  exam_time: string
-  total_marks: string
-  instructions: string
-  page_size: string
-  margin_top: string
-  margin_bottom: string
-  margin_left: string
-  margin_right: string
-  font_family: string
-  font_size: string
-}
-
 interface Question {
   id: string
-  subject: string
-  question_no: number
+  paper_id: string
+  type: string
   question_text: string
-  option_a: string
-  option_b: string
-  option_c: string
-  option_d: string
+  options: string[]
   correct_answer: string
-  question_set: string | null
+  marks: number
+  order_index: number
   created_at: string
+  updated_at: string
+  question_papers?: {
+    title: string
+    header_info: any
+    page_size: string
+    margins: any
+  }
 }
 
 export default function QuestionPreview() {
@@ -47,76 +36,15 @@ export default function QuestionPreview() {
   const [subjects, setSubjects] = useState<string[]>([])
   const [questionSets, setQuestionSets] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [examSettings, setExamSettings] = useState<ExamSettings>({
-    school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
-    school_address: '',
-    exam_type: 'বার্ষিক পরীক্ষা',
-    exam_time: '২ ঘণ্টা ৩০ মিনিট',
-    total_marks: '১০০',
-    instructions: 'প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।',
-    page_size: 'A4',
-    margin_top: '1in',
-    margin_bottom: '1in',
-    margin_left: '1in',
-    margin_right: '1in',
-    font_family: 'noto-serif',
-    font_size: '14px',
-  })
   const printRef = useRef<HTMLDivElement>(null)
-
-  // Get font configuration
-  const getFontConfig = (fontFamily: string, fontSize: string) => {
-    const fontFamilyMap = {
-      'noto-serif': "'Noto Serif Bengali', serif",
-      'kalpurush': "'Kalpurush', sans-serif",
-      'solaiman': "'SolaimanLipi', serif",
-      'arial': "Arial, sans-serif",
-      'times-new-roman': "'Times New Roman', serif",
-      'calibri': "Calibri, sans-serif",
-      'georgia': "Georgia, serif"
-    }
-    
-    return {
-      fontFamily: fontFamilyMap[fontFamily as keyof typeof fontFamilyMap] || fontFamilyMap['noto-serif'],
-      fontSize: fontSize || '14px'
-    }
-  }
-
-  // Get page size configuration
-  const getPageConfig = (pageSize: string) => {
-    switch (pageSize) {
-      case 'Letter':
-        return {
-          questionsPerColumn: 9,
-          pageClass: 'letter-page',
-          size: 'Letter'
-        }
-      case 'Legal':
-        return {
-          questionsPerColumn: 9,
-          pageClass: 'legal-page', 
-          size: 'Legal'
-        }
-      case 'A4':
-      default:
-        return {
-          questionsPerColumn: 9,
-          pageClass: 'a4-page',
-          size: 'A4'
-        }
-    }
-  }
-
-  const fontConfig = getFontConfig(examSettings.font_family, examSettings.font_size)
-  const pageConfig = getPageConfig(examSettings.page_size)
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `${selectedSubject || 'All'} - Questions`,
     pageStyle: `
       @page {
-        size: ${pageConfig.size};
-        margin: ${examSettings.margin_top} ${examSettings.margin_right} ${examSettings.margin_bottom} ${examSettings.margin_left};
+        size: A4;
+        margin: 1in;
       }
       
       @media print {
@@ -142,7 +70,6 @@ export default function QuestionPreview() {
 
   useEffect(() => {
     fetchQuestions()
-    fetchExamSettings()
   }, [])
 
   useEffect(() => {
@@ -155,12 +82,21 @@ export default function QuestionPreview() {
       const user = await getCurrentUser()
       if (!user) return
 
+      // Get questions with their question papers
       const { data, error } = await supabase
         .from('questions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('subject', { ascending: true })
-        .order('question_no', { ascending: true })
+        .select(`
+          *,
+          question_papers!inner(
+            title,
+            header_info,
+            page_size,
+            margins,
+            user_id
+          )
+        `)
+        .eq('question_papers.user_id', user.id)
+        .order('order_index', { ascending: true })
 
       if (error) {
         console.error('Error fetching questions:', error)
@@ -168,8 +104,8 @@ export default function QuestionPreview() {
         setQuestions(data || [])
         
         // Extract unique subjects and sets
-        const uniqueSubjects = [...new Set(data?.map(q => q.subject) || [])]
-        const uniqueSets = [...new Set(data?.map(q => q.question_set).filter(Boolean) || [])]
+        const uniqueSubjects = [...new Set((data || []).map(q => q.question_papers?.header_info?.subject).filter(Boolean))]
+        const uniqueSets = [...new Set((data || []).map(q => q.question_papers?.title).filter(Boolean))]
         
         setSubjects(uniqueSubjects)
         setQuestionSets(uniqueSets)
@@ -181,50 +117,15 @@ export default function QuestionPreview() {
     }
   }
 
-  const fetchExamSettings = async () => {
-    try {
-      const user = await getCurrentUser()
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('exam_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching exam settings:', error)
-      } else if (data) {
-        setExamSettings({
-          school_name: data.school_name,
-          school_address: data.school_address || '',
-          exam_type: data.exam_type,
-          exam_time: data.exam_time,
-          total_marks: data.total_marks,
-          instructions: data.instructions,
-          page_size: data.page_size || 'A4',
-          margin_top: data.margin_top || '1in',
-          margin_bottom: data.margin_bottom || '1in',
-          margin_left: data.margin_left || '1in',
-          margin_right: data.margin_right || '1in',
-          font_family: data.font_family || 'noto-serif',
-          font_size: data.font_size || '14px',
-        })
-      }
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
-
   const filterQuestions = () => {
     let filtered = questions
 
     if (selectedSubject && selectedSubject !== 'all') {
-      filtered = filtered.filter(q => q.subject === selectedSubject)
+      filtered = filtered.filter(q => q.question_papers?.header_info?.subject === selectedSubject)
     }
 
     if (selectedSet && selectedSet !== 'all') {
-      filtered = filtered.filter(q => q.question_set === selectedSet)
+      filtered = filtered.filter(q => q.question_papers?.title === selectedSet)
     }
 
     setFilteredQuestions(filtered)
@@ -235,15 +136,16 @@ export default function QuestionPreview() {
     return num.toString().split('').map(digit => banglaNumbers[parseInt(digit)]).join('')
   }
 
-  // Function to split questions into pages with two columns based on page size
+  // Function to split questions into pages with two columns
   const splitQuestionsIntoPages = (questions: Question[]) => {
-    const questionsPerPage = pageConfig.questionsPerColumn * 2
+    const questionsPerColumn = 9
+    const questionsPerPage = questionsPerColumn * 2
     const pages = []
     
     for (let i = 0; i < questions.length; i += questionsPerPage) {
       const pageQuestions = questions.slice(i, i + questionsPerPage)
-      const leftColumn = pageQuestions.slice(0, pageConfig.questionsPerColumn)
-      const rightColumn = pageQuestions.slice(pageConfig.questionsPerColumn)
+      const leftColumn = pageQuestions.slice(0, questionsPerColumn)
+      const rightColumn = pageQuestions.slice(questionsPerColumn)
       
       pages.push({
         leftColumn,
@@ -311,12 +213,10 @@ export default function QuestionPreview() {
       <div ref={printRef}>
         <style jsx global>{`
           @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;600;700&display=swap');
-          @import url('https://fonts.googleapis.com/css2?family=Kalpurush:wght@400;600;700&display=swap');
-          @import url('https://fonts.googleapis.com/css2?family=SolaimanLipi:wght@400;600;700&display=swap');
           
           .bengali-text {
-            font-family: ${fontConfig.fontFamily};
-            font-size: ${fontConfig.fontSize};
+            font-family: 'Noto Serif Bengali', serif;
+            font-size: 14px;
             line-height: 1.5;
           }
           
@@ -333,7 +233,7 @@ export default function QuestionPreview() {
               margin: 0 !important;
               padding: 0 !important;
               -webkit-print-color-adjust: exact;
-              font-family: ${fontConfig.fontFamily} !important;
+              font-family: 'Noto Serif Bengali', serif !important;
             }
             
             .page-break {
@@ -350,8 +250,8 @@ export default function QuestionPreview() {
             }
             
             @page {
-              size: ${pageConfig.size} !important;
-              margin: ${examSettings.margin_top} ${examSettings.margin_right} ${examSettings.margin_bottom} ${examSettings.margin_left} !important;
+              size: A4 !important;
+              margin: 1in !important;
             }
             
             .print-page {
@@ -371,7 +271,7 @@ export default function QuestionPreview() {
             }
             
             .bengali-text {
-              font-family: ${fontConfig.fontFamily} !important;
+              font-family: 'Noto Serif Bengali', serif !important;
               font-size: 11px !important;
               line-height: 1.3 !important;
             }
@@ -456,12 +356,8 @@ export default function QuestionPreview() {
           
           @media screen {
             .print-page {
-              min-height: ${pageConfig.size === 'A4' ? '297mm' : 
-                           pageConfig.size === 'Letter' ? '11in' : 
-                           pageConfig.size === 'Legal' ? '14in' : '297mm'};
-              width: ${pageConfig.size === 'A4' ? '210mm' : 
-                      pageConfig.size === 'Letter' ? '8.5in' : 
-                      pageConfig.size === 'Legal' ? '8.5in' : '210mm'};
+              min-height: 297mm;
+              width: 210mm;
               background: white;
               box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
               margin: 20px auto;
@@ -486,19 +382,14 @@ export default function QuestionPreview() {
                 <div className="text-center mb-4 bengali-text avoid-break exam-header">
                   <div className="border-2 border-black p-4 mb-4">
                     <h1 className="text-xl font-bold mb-2 exam-title">
-                      {examSettings.school_name}
+                      বাংলাদেশ শিক্ষা বোর্ড
                     </h1>
-                    {examSettings.school_address && (
-                      <p className="text-sm mb-2">
-                        {examSettings.school_address}
-                      </p>
-                    )}
                     <h2 className="text-lg font-semibold mb-2 exam-subtitle">
-                      {examSettings.exam_type} - {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
+                      বার্ষিক পরীক্ষা - {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
                     </h2>
                     <div className="flex justify-between items-center text-sm">
-                      <span>সময়: {examSettings.exam_time}</span>
-                      <span>পূর্ণমান: {examSettings.total_marks}</span>
+                      <span>সময়: ২ ঘণ্টা ৩০ মিনিট</span>
+                      <span>পূর্ণমান: ১০০</span>
                     </div>
                     {selectedSet && selectedSet !== 'all' && (
                       <div className="mt-2 text-sm">
@@ -513,7 +404,7 @@ export default function QuestionPreview() {
               {pageIndex === 0 && (
                 <div className="mb-3 bengali-text text-sm avoid-break exam-instructions">
                   <p className="mb-3">
-                    <strong>নির্দেশনা:</strong> {examSettings.instructions}
+                    <strong>নির্দেশনা:</strong> প্রতিটি প্রশ্নের চারটি উত্তর দেওয়া আছে। সঠিক উত্তরটি বেছে নিয়ে উত্তরপত্রে প্রয়োজনীয় স্থানে সম্পূর্ণ বৃত্তটি কালো কর।
                   </p>
                 </div>
               )}
@@ -525,25 +416,25 @@ export default function QuestionPreview() {
                   {page.leftColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
                       <div className="font-semibold mb-2 text-base leading-tight question-header">
-                        {getBanglaNumber(question.question_no)}। {question.question_text}
+                        {getBanglaNumber(question.order_index)}। {question.question_text}
                       </div>
                       <div className="text-sm question-options">
                         <div className="option-grid">
                         <div className="option-item">
                           <span className="option-label">ক)</span>
-                          <span className="option-text">{question.option_a}</span>
+                          <span className="option-text">{question.options?.[0] || ''}</span>
                         </div>
                         <div className="option-item">
                           <span className="option-label">খ)</span>
-                          <span className="option-text">{question.option_b}</span>
+                          <span className="option-text">{question.options?.[1] || ''}</span>
                         </div>
                         <div className="option-item">
                           <span className="option-label">গ)</span>
-                          <span className="option-text">{question.option_c}</span>
+                          <span className="option-text">{question.options?.[2] || ''}</span>
                         </div>
                         <div className="option-item">
                           <span className="option-label">ঘ)</span>
-                          <span className="option-text">{question.option_d}</span>
+                          <span className="option-text">{question.options?.[3] || ''}</span>
                         </div>
                         </div>
                       </div>
@@ -556,25 +447,25 @@ export default function QuestionPreview() {
                   {page.rightColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
                       <div className="font-semibold mb-2 text-base leading-tight question-header">
-                        {getBanglaNumber(question.question_no)}। {question.question_text}
+                        {getBanglaNumber(question.order_index)}। {question.question_text}
                       </div>
                       <div className="text-sm question-options">
                         <div className="option-grid">
                         <div className="option-item">
                           <span className="option-label">ক)</span>
-                          <span className="option-text">{question.option_a}</span>
+                          <span className="option-text">{question.options?.[0] || ''}</span>
                         </div>
                         <div className="option-item">
                           <span className="option-label">খ)</span>
-                          <span className="option-text">{question.option_b}</span>
+                          <span className="option-text">{question.options?.[1] || ''}</span>
                         </div>
                         <div className="option-item">
                           <span className="option-label">গ)</span>
-                          <span className="option-text">{question.option_c}</span>
+                          <span className="option-text">{question.options?.[2] || ''}</span>
                         </div>
                         <div className="option-item">
                           <span className="option-label">ঘ)</span>
-                          <span className="option-text">{question.option_d}</span>
+                          <span className="option-text">{question.options?.[3] || ''}</span>
                         </div>
                         </div>
                       </div>
@@ -594,7 +485,7 @@ export default function QuestionPreview() {
               <div className="grid grid-cols-4 gap-4 text-sm">
                 {filteredQuestions.map((question) => (
                   <div key={question.id} className="bengali-text">
-                    {getBanglaNumber(question.question_no)}. {question.correct_answer === 'A' ? 'ক' : 
+                    {getBanglaNumber(question.order_index)}. {question.correct_answer === 'A' ? 'ক' : 
                      question.correct_answer === 'B' ? 'খ' : 
                      question.correct_answer === 'C' ? 'গ' : 'ঘ'}
                   </div>

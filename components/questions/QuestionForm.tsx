@@ -49,16 +49,19 @@ interface QuestionFormProps {
 
 interface SavedQuestion {
   id: string
-  subject: string
-  question_no: number
+  paper_id: string
+  type: string
   question_text: string
-  option_a: string
-  option_b: string
-  option_c: string
-  option_d: string
+  options: string[]
   correct_answer: string
-  question_set: string | null
+  marks: number
+  order_index: number
   created_at: string
+  updated_at: string
+  question_papers?: {
+    title: string
+    header_info: any
+  }
 }
 
 export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
@@ -66,7 +69,7 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
   const [questions, setQuestions] = useState<QuestionFormData[]>([])
   const [savedQuestions, setSavedQuestions] = useState<SavedQuestion[]>([])
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<SavedQuestion | null>(null)
+  const [editForm, setEditForm] = useState<any>(null)
   const [isLoadingSaved, setIsLoadingSaved] = useState(true)
 
   const {
@@ -93,10 +96,18 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
       const user = await getCurrentUser()
       if (!user) return
 
+      // Get questions with their question papers
       const { data, error } = await supabase
         .from('questions')
-        .select('*')
-        .eq('user_id', user.id)
+        .select(`
+          *,
+          question_papers!inner(
+            title,
+            header_info,
+            user_id
+          )
+        `)
+        .eq('question_papers.user_id', user.id)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -141,9 +152,56 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
         return
       }
 
-      const questionsToSave = questions.map(q => ({
-        ...q,
-        user_id: user.id,
+      // Create or find a question paper for this set
+      const firstQuestion = questions[0]
+      const paperTitle = firstQuestion.question_set || `${firstQuestion.subject} Questions`
+      
+      let paperId: string
+      
+      // Check if a paper with this title already exists
+      const { data: existingPaper } = await supabase
+        .from('question_papers')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('title', paperTitle)
+        .single()
+      
+      if (existingPaper) {
+        paperId = existingPaper.id
+      } else {
+        // Create a new question paper
+        const { data: newPaper, error: paperError } = await supabase
+          .from('question_papers')
+          .insert({
+            user_id: user.id,
+            title: paperTitle,
+            header_info: {
+              subject: firstQuestion.subject,
+              exam_type: 'MCQ',
+              total_marks: questions.length.toString()
+            }
+          })
+          .select('id')
+          .single()
+        
+        if (paperError || !newPaper) {
+          toast.error('Failed to create question paper')
+          console.error(paperError)
+          return
+        }
+        
+        paperId = newPaper.id
+      }
+
+      // Transform questions to new format
+      const questionsToSave = questions.map((q, index) => ({
+        paper_id: paperId,
+        type: 'mcq',
+        question_text: q.question_text,
+        options: [q.option_a, q.option_b, q.option_c, q.option_d],
+        correct_answer: q.correct_answer,
+        marks: 1,
+        order_index: q.question_no
       }))
 
       const { error } = await supabase
@@ -168,7 +226,18 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
 
   const startEdit = (question: SavedQuestion) => {
     setEditingQuestion(question.id)
-    setEditForm({ ...question })
+    setEditForm({
+      id: question.id,
+      subject: question.question_papers?.header_info?.subject || 'Unknown',
+      question_no: question.order_index,
+      question_text: question.question_text,
+      option_a: question.options?.[0] || '',
+      option_b: question.options?.[1] || '',
+      option_c: question.options?.[2] || '',
+      option_d: question.options?.[3] || '',
+      correct_answer: question.correct_answer,
+      question_set: question.question_papers?.title || null,
+    })
   }
 
   const cancelEdit = () => {
@@ -183,15 +252,10 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
       const { error } = await supabase
         .from('questions')
         .update({
-          subject: editForm.subject,
-          question_no: editForm.question_no,
           question_text: editForm.question_text,
-          option_a: editForm.option_a,
-          option_b: editForm.option_b,
-          option_c: editForm.option_c,
-          option_d: editForm.option_d,
+          options: [editForm.option_a, editForm.option_b, editForm.option_c, editForm.option_d],
           correct_answer: editForm.correct_answer,
-          question_set: editForm.question_set,
+          order_index: editForm.question_no
         })
         .eq('id', editForm.id)
 
@@ -525,14 +589,14 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                              {question.subject}
+                              {question.question_papers?.header_info?.subject || 'Unknown'}
                             </span>
                             <span className="text-sm text-gray-600">
-                              প্রশ্ন নং: {question.question_no}
+                              প্রশ্ন নং: {question.order_index}
                             </span>
-                            {question.question_set && (
+                            {question.question_papers?.title && (
                               <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                                {question.question_set}
+                                {question.question_papers.title}
                               </span>
                             )}
                           </div>
@@ -558,10 +622,10 @@ export default function QuestionForm({ onQuestionAdded }: QuestionFormProps) {
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-                        <div>ক) {question.option_a}</div>
-                        <div>খ) {question.option_b}</div>
-                        <div>গ) {question.option_c}</div>
-                        <div>ঘ) {question.option_d}</div>
+                        <div>ক) {question.options?.[0] || ''}</div>
+                        <div>খ) {question.options?.[1] || ''}</div>
+                        <div>গ) {question.options?.[2] || ''}</div>
+                        <div>ঘ) {question.options?.[3] || ''}</div>
                       </div>
                       <div className="text-sm text-green-600">
                         সঠিক উত্তর: {question.correct_answer === 'A' ? 'ক' : 
