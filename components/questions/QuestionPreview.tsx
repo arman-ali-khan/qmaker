@@ -240,11 +240,13 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
         setQuestions(data || [])
         
         // Extract unique sets
-        const uniqueSets = [...new Set((data || [])
-          .map(q => q.question_papers?.title)
-          .filter(Boolean)
-          .filter(title => title && title.trim() !== '')
-        )]
+        const uniqueSet = new Set<string>();
+(data || []).forEach(q => {
+  const title = q.question_papers?.title?.trim();
+  if (title) uniqueSet.add(title);
+});
+const uniqueSets = Array.from(uniqueSet);
+
         
         console.log('Unique sets found:', uniqueSets)
         
