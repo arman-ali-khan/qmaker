@@ -42,6 +42,7 @@ interface Question {
   correct_answer: string
   marks: number
   order_index: number
+  column_layout?: string
   created_at: string
   updated_at: string
   question_papers?: {
@@ -260,20 +261,37 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
     return num.toString().split('').map(digit => banglaNumbers[parseInt(digit)]).join('')
   }
 
-  // Function to split questions into pages with two columns
+  // Function to split questions into pages based on column layout
   const splitQuestionsIntoPages = (questions: Question[]) => {
+    // Group questions by their column layout preference
+    const singleColumnQuestions = questions.filter(q => q.column_layout === 'single-column')
+    const twoColumnQuestions = questions.filter(q => q.column_layout !== 'single-column')
+    
     const questionsPerColumn = 9
     const questionsPerPage = questionsPerColumn * 2
     const pages = []
     
-    for (let i = 0; i < questions.length; i += questionsPerPage) {
-      const pageQuestions = questions.slice(i, i + questionsPerPage)
+    // Handle single column questions first
+    const singleColumnQuestionsPerPage = 18 // More questions per page for single column
+    for (let i = 0; i < singleColumnQuestions.length; i += singleColumnQuestionsPerPage) {
+      const pageQuestions = singleColumnQuestions.slice(i, i + singleColumnQuestionsPerPage)
+      pages.push({
+        leftColumn: pageQuestions,
+        rightColumn: [],
+        layoutType: 'single-column'
+      })
+    }
+    
+    // Handle two column questions
+    for (let i = 0; i < twoColumnQuestions.length; i += questionsPerPage) {
+      const pageQuestions = twoColumnQuestions.slice(i, i + questionsPerPage)
       const leftColumn = pageQuestions.slice(0, questionsPerColumn)
       const rightColumn = pageQuestions.slice(questionsPerColumn)
       
       pages.push({
         leftColumn,
-        rightColumn
+        rightColumn,
+        layoutType: 'two-column'
       })
     }
     
@@ -472,7 +490,7 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
             .question-columns {
               gap: 16px !important;
               display: grid !important;
-              grid-template-columns: 1fr 1fr !important;
+              grid-template-columns: var(--columns) !important;
             }
             
             .question-column {
@@ -481,10 +499,15 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
               gap: 8px !important;
             }
             
-            .option-grid {
-              display: grid !important;
+            .single-column-layout .question-columns {
               grid-template-columns: 1fr !important;
-              gap: 1px !important;
+            }
+            
+            .option-grid {
+                  display: grid;
+                  grid-template-columns: repeat(2, minmax(0, 1fr));
+                  gap: 3px;
+                  width: 50%;
             }
             
             .option-item {
@@ -565,7 +588,12 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
               )}
 
               {/* Questions in two columns */}
-              <div className="bengali-text question-columns">
+              <div 
+                className={`bengali-text question-columns ${page.layoutType === 'single-column' ? 'single-column-layout' : ''}`}
+                style={{
+                  '--columns': page.layoutType === 'single-column' ? '1fr' : '1fr 1fr'
+                } as React.CSSProperties}
+              >
                 {/* Left Column */}
                 <div className="question-column">
                   {page.leftColumn.map((question) => (
@@ -598,7 +626,7 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                 </div>
 
                 {/* Right Column */}
-                <div className="question-column">
+                {page.layoutType === 'two-column' && <div className="question-column">
                   {page.rightColumn.map((question) => (
                     <div key={question.id} className="avoid-break question-item">
                       <div className="font-semibold mb-2 text-base leading-tight question-header">
@@ -626,7 +654,7 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
                       </div>
                     </div>
                   ))}
-                </div>
+                </div>}
               </div>
             </div>
           ))

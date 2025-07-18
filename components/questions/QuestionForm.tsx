@@ -26,6 +26,7 @@ const questionSchema = z.object({
   option_d: z.string().min(1, 'Option D is required'),
   correct_answer: z.enum(['A', 'B', 'C', 'D']),
   question_set: z.string().optional(),
+  column_layout: z.enum(['single-column', 'two-column']).default('two-column'),
 })
 
 type QuestionFormData = z.infer<typeof questionSchema>
@@ -51,6 +52,7 @@ interface SavedQuestion {
   order_index: number
   created_at: string
   updated_at: string
+  column_layout?: string
   question_papers?: {
     title: string
     header_info: any
@@ -78,6 +80,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
     resolver: zodResolver(questionSchema),
     defaultValues: {
       question_no: 1,
+      column_layout: 'two-column',
     },
   })
 
@@ -267,7 +270,8 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
         options: [data.option_a, data.option_b, data.option_c, data.option_d],
         correct_answer: data.correct_answer,
         marks: 1,
-        order_index: data.question_no
+        order_index: data.question_no,
+        column_layout: data.column_layout
       }
 
       const { error } = await supabase
@@ -283,6 +287,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
           subject: data.subject,
           question_set: data.question_set,
           question_no: data.question_no + 1,
+          column_layout: data.column_layout,
         })
         fetchSavedQuestions() // Refresh the saved questions list
         onQuestionAdded()
@@ -307,6 +312,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
       option_d: question.options?.[3] || '',
       correct_answer: question.correct_answer,
       question_set: question.question_papers?.title || null,
+      column_layout: question.column_layout || 'two-column',
     })
   }
 
@@ -360,7 +366,8 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
           question_text: editForm.question_text,
           options: [editForm.option_a, editForm.option_b, editForm.option_c, editForm.option_d],
           correct_answer: editForm.correct_answer,
-          order_index: editForm.question_no
+          order_index: editForm.question_no,
+          column_layout: editForm.column_layout
         })
         .eq('id', editForm.id)
 
@@ -489,6 +496,26 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                 placeholder="মডেল টেস্ট ১, চূড়ান্ত পরীক্ষা ইত্যাদি"
                 {...register('question_set')}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>প্রদর্শন বিন্যাস</Label>
+              <RadioGroup
+                defaultValue="two-column"
+                onValueChange={(value) => setValue('column_layout', value as 'single-column' | 'two-column')}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single-column" id="single_column" />
+                  <Label htmlFor="single_column">একক কলাম প্রদর্শন</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="two-column" id="two_column" />
+                  <Label htmlFor="two_column">দুই কলাম প্রদর্শন</Label>
+                </div>
+              </RadioGroup>
+              {errors.column_layout && (
+                <p className="text-sm text-red-500">{errors.column_layout.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -652,6 +679,23 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                       </div>
                       
                       <div>
+                        <Label>প্রদর্শন বিন্যাস</Label>
+                        <RadioGroup
+                          value={editForm?.column_layout || 'two-column'}
+                          onValueChange={(value) => setEditForm(prev => prev ? {...prev, column_layout: value} : null)}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="single-column" id="edit_single_column" />
+                            <Label htmlFor="edit_single_column">একক কলাম প্রদর্শন</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="two-column" id="edit_two_column" />
+                            <Label htmlFor="edit_two_column">দুই কলাম প্রদর্শন</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                      
+                      <div>
                         <Label>প্রশ্ন</Label>
                         <Textarea
                           value={editForm?.question_text || ''}
@@ -744,6 +788,9 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                                 {question.question_papers.title}
                               </span>
                             )}
+                            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                              {question.column_layout === 'single-column' ? 'একক কলাম' : 'দুই কলাম'}
+                            </span>
                           </div>
                           <h3 className="font-medium mb-2">
                             {question.question_text}
