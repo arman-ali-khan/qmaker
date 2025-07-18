@@ -616,7 +616,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <div>
                           <Label>বিষয়</Label>
                           <Select 
-                            value={editForm?.subject || ''} 
+                            value={editForm?.subject || 'বাংলা'} 
                             onValueChange={(value) => {
                               setEditForm(prev => prev ? {...prev, subject: value} : null)
                             }}
@@ -734,7 +734,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                              {question.question_papers?.header_info?.subject || 'বিষয় অজানা'}
+                              {question.question_papers?.header_info?.subject || 'Unknown Subject'}
                             </span>
                             <span className="text-sm text-gray-600">
                               প্রশ্ন নং: {question.order_index}

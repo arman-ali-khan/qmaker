@@ -158,23 +158,43 @@ export default function ExamSettingsForm({ onSettingsUpdated, user }: ExamSettin
 
       if (existingPaper) {
         // Update existing question papers with new settings
-        const { error } = await supabase
+        // Get all existing question papers to preserve their individual subjects
+        const { data: existingPapers, error: fetchError } = await supabase
           .from('question_papers')
-          .update({
-            page_size: data.page_size,
-            margins: margins,
-            header_info: headerInfo,
-            updated_at: new Date().toISOString()
-          })
+          .select('id, header_info')
           .eq('user_id', user.id)
 
-        if (error) {
-          toast.error('Failed to save settings')
-          console.error(error)
-        } else {
-          toast.success('Settings saved successfully!')
-          onSettingsUpdated()
+        if (fetchError) {
+          toast.error('Failed to fetch existing papers')
+          console.error(fetchError)
+          return
         }
+
+        // Update each paper individually to preserve its subject
+        for (const paper of existingPapers || []) {
+          const preservedHeaderInfo = {
+            ...headerInfo,
+            // Preserve the existing subject if it exists
+            subject: paper.header_info?.subject || headerInfo.subject || ''
+          }
+
+          const { error: updateError } = await supabase
+            .from('question_papers')
+            .update({
+              page_size: data.page_size,
+              margins: margins,
+              header_info: preservedHeaderInfo,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', paper.id)
+
+          if (updateError) {
+            console.error('Error updating paper:', updateError)
+          }
+        }
+
+        toast.success('Settings saved successfully!')
+        onSettingsUpdated()
       } else {
         // Create a default question paper with these settings
         const { error } = await supabase

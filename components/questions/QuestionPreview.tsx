@@ -243,7 +243,7 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
 
     if (selectedSubject && selectedSubject !== 'all') {
       filtered = filtered.filter(q => {
-        const subject = q.question_papers?.header_info?.subject
+        const subject = q.question_papers?.header_info?.subject || 'Unknown'
         return subject === selectedSubject
       })
     }
