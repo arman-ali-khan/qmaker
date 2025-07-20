@@ -34,6 +34,7 @@ type QuestionFormData = z.infer<typeof questionSchema>
 interface QuestionFormProps {
   onQuestionAdded: () => void
   user: User | null
+  selectedSubject?: string
 }
 
 interface Subject {
@@ -59,7 +60,7 @@ interface SavedQuestion {
   }
 }
 
-export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProps) {
+export default function QuestionForm({ onQuestionAdded, user, selectedSubject }: QuestionFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [savedQuestions, setSavedQuestions] = useState<SavedQuestion[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
@@ -87,7 +88,19 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
   useEffect(() => {
     fetchSavedQuestions()
     fetchSubjects()
+    
+    // Set selected subject if provided
+    if (selectedSubject) {
+      setValue('subject', selectedSubject)
+    }
   }, [])
+
+  useEffect(() => {
+    // Update form when selectedSubject changes
+    if (selectedSubject) {
+      setValue('subject', selectedSubject)
+    }
+  }, [selectedSubject, setValue])
 
   const fetchSubjects = async () => {
     try {
@@ -146,8 +159,7 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
     try {
       if (!user) return
 
-      // Get questions with their question papers
-      const { data, error } = await supabase
+      let query = supabase
         .from('questions')
         .select(`
           *,
@@ -159,6 +171,13 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
         `)
         .eq('question_papers.user_id', user.id)
         .order('created_at', { ascending: false })
+
+      // Filter by selected subject if provided
+      if (selectedSubject) {
+        query = query.eq('question_papers.header_info->>subject', selectedSubject)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching questions:', error)
@@ -435,7 +454,10 @@ export default function QuestionForm({ onQuestionAdded, user }: QuestionFormProp
               <div className="space-y-2">
                 <Label htmlFor="subject">বিষয়</Label>
                 <div className="space-y-2">
-                  <Select onValueChange={(value) => setValue('subject', value)}>
+                  <Select 
+                    value={watch('subject') || selectedSubject || ''} 
+                    onValueChange={(value) => setValue('subject', value)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="বিষয় নির্বাচন করুন" />
                     </SelectTrigger>

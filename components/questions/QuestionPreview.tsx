@@ -62,13 +62,14 @@ interface Question {
 interface QuestionPreviewProps {
   user: User | null
   key?: string
+  selectedSubject?: string
 }
 
-export default function QuestionPreview({ user }: QuestionPreviewProps) {
+export default function QuestionPreview({ user, selectedSubject }: QuestionPreviewProps) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([])
   const [examSettings, setExamSettings] = useState<ExamSettings | null>(null)
-  const [selectedSubject, setSelectedSubject] = useState<string>('')
+  const [filterSubject, setFilterSubject] = useState<string>('')
   const [selectedSet, setSelectedSet] = useState<string>('')
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [questionSets, setQuestionSets] = useState<string[]>([])
@@ -121,7 +122,14 @@ export default function QuestionPreview({ user }: QuestionPreviewProps) {
 
   useEffect(() => {
     filterQuestions()
-  }, [questions, selectedSubject, selectedSet])
+  }, [questions, filterSubject, selectedSet, selectedSubject])
+
+  useEffect(() => {
+    // Set filter subject when selectedSubject prop changes
+    if (selectedSubject) {
+      setFilterSubject(selectedSubject)
+    }
+  }, [selectedSubject])
 
   const fetchSubjects = async () => {
     try {
@@ -262,10 +270,13 @@ const uniqueSets = Array.from(uniqueSet);
   const filterQuestions = () => {
     let filtered = questions
 
-    if (selectedSubject && selectedSubject !== 'all') {
+    // Use selectedSubject prop first, then filterSubject
+    const subjectToFilter = selectedSubject || filterSubject
+    
+    if (subjectToFilter && subjectToFilter !== 'all') {
       filtered = filtered.filter(q => {
         const subject = q.question_papers?.header_info?.subject || 'Unknown'
-        return subject === selectedSubject
+        return subject === subjectToFilter
       })
     }
 
@@ -387,7 +398,11 @@ const uniqueSets = Array.from(uniqueSet);
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+            <Select 
+              value={filterSubject || selectedSubject || ''} 
+              onValueChange={setFilterSubject}
+              disabled={!!selectedSubject} // Disable if subject is selected from sidebar
+            >
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="বিষয় নির্বাচন করুন" />
               </SelectTrigger>
@@ -420,6 +435,14 @@ const uniqueSets = Array.from(uniqueSet);
               প্রিন্ট করুন
             </Button>
           </div>
+          
+          {selectedSubject && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>নির্বাচিত বিষয়:</strong> {selectedSubject}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -609,7 +632,7 @@ const uniqueSets = Array.from(uniqueSet);
                       <p className="text-sm mb-2">{examSettings.school_address}</p>
                     )}
                     <h2 className="text-lg font-semibold mb-2 exam-subtitle">
-                      {examSettings?.exam_type || 'বার্ষিক পরীক্ষা'} - {selectedSubject && selectedSubject !== 'all' ? selectedSubject : 'সকল বিষয়'}
+                      {examSettings?.exam_type || 'বার্ষিক পরীক্ষা'} - {(selectedSubject || filterSubject) && (selectedSubject || filterSubject) !== 'all' ? (selectedSubject || filterSubject) : 'সকল বিষয়'}
                     </h2>
                     <div className="flex justify-between items-center text-sm">
                       <span>সময়: {examSettings?.exam_time || '২ ঘণ্টা ৩০ মিনিট'}</span>
