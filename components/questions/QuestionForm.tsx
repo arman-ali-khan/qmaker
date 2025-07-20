@@ -174,7 +174,7 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
 
       // Filter by selected subject if provided
       if (selectedSubject) {
-        query = query.eq('question_papers.header_info->>subject', selectedSubject)
+        query = query.filter('question_papers.header_info->>subject', 'eq', selectedSubject)
       }
 
       const { data, error } = await query

@@ -1,5 +1,5 @@
-import DashboardLayout from '@/components/layout/DashboardLayout'
+import DashboardWithSidebar from '@/components/layout/DashboardWithSidebar'
 
 export default function Dashboard() {
-  return <DashboardLayout />
+  return <DashboardWithSidebar />
 }

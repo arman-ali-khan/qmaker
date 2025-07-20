@@ -68,7 +68,7 @@ export default function DashboardSidebar({
             .from('questions')
             .select('*', { count: 'exact', head: true })
             .eq('question_papers.user_id', user.id)
-            .eq('question_papers.header_info->>subject', subject.name)
+            .filter('question_papers.header_info->>subject', 'eq', subject.name)
             .not('question_papers', 'is', null)
 
           return {
