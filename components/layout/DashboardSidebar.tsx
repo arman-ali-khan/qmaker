@@ -64,12 +64,25 @@ export default function DashboardSidebar({
       // Get question counts for each subject
       const subjectsWithCounts = await Promise.all(
         (subjectsData || []).map(async (subject) => {
+          // First, get paper IDs for this subject and user
+          const { data: paperIds } = await supabase
+            .from('question_papers')
+            .select('id')
+            .eq('user_id', user.id)
+            .filter('header_info->>subject', 'eq', subject.name)
+
+          if (!paperIds || paperIds.length === 0) {
+            return {
+              ...subject,
+              question_count: 0
+            }
+          }
+
+          // Then, count questions for these papers
           const { count } = await supabase
             .from('questions')
             .select('*', { count: 'exact', head: true })
-            .eq('question_papers.user_id', user.id)
-            .filter('question_papers.header_info->>subject', 'eq', subject.name)
-            .not('question_papers', 'is', null)
+            .in('paper_id', paperIds.map(p => p.id))
 
           return {
             ...subject,

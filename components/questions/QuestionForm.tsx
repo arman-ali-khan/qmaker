@@ -69,6 +69,7 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<any>(null)
   const [isLoadingSaved, setIsLoadingSaved] = useState(true)
+  const [displayedQuestions, setDisplayedQuestions] = useState<SavedQuestion[]>([])
 
   const {
     register,
@@ -86,14 +87,30 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
   })
 
   useEffect(() => {
-    fetchSavedQuestions()
+    if (user) {
+      fetchSavedQuestions()
+    }
     fetchSubjects()
-    
+  }, [user])
+
+  useEffect(() => {
     // Set selected subject if provided
     if (selectedSubject) {
       setValue('subject', selectedSubject)
     }
-  }, [])
+  }, [selectedSubject, setValue])
+
+  useEffect(() => {
+    // Client-side filtering based on selectedSubject
+    if (selectedSubject) {
+      const filtered = savedQuestions.filter(question => 
+        question.question_papers?.header_info?.subject === selectedSubject
+      )
+      setDisplayedQuestions(filtered)
+    } else {
+      setDisplayedQuestions(savedQuestions)
+    }
+  }, [savedQuestions, selectedSubject])
 
   useEffect(() => {
     // Update form when selectedSubject changes
@@ -159,7 +176,7 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
     try {
       if (!user) return
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('questions')
         .select(`
           *,
@@ -171,13 +188,6 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
         `)
         .eq('question_papers.user_id', user.id)
         .order('created_at', { ascending: false })
-
-      // Filter by selected subject if provided
-      if (selectedSubject) {
-        query = query.filter('question_papers.header_info->>subject', 'eq', selectedSubject)
-      }
-
-      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching questions:', error)
@@ -201,23 +211,26 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
         return
       }
 
-      // Create or find a question paper for this set
-      const paperTitle = data.question_set || `${data.subject} Questions`
+      // Create a unique paper title that includes subject to avoid conflicts
+      const paperTitle = data.question_set ? 
+        `${data.question_set} - ${data.subject}` : 
+        `${data.subject} Questions`
       
       let paperId: string | null = null
       
-      // Check if a paper with this title already exists
+      // Check if a paper with this exact title and subject already exists
       const { data: existingPaper } = await supabase
         .from('question_papers')
         .select('id')
         .eq('user_id', user.id)
         .eq('title', paperTitle)
+        .filter('header_info->>subject', 'eq', data.subject)
         .maybeSingle()
       
       if (existingPaper) {
         paperId = existingPaper.id
       } else {
-        // Create a new question paper
+        // Create a new question paper with proper subject isolation
         const { data: newPaper, error: paperError } = await supabase
           .from('question_papers')
           .insert({
@@ -243,43 +256,8 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
         paperId = newPaper.id
       }
 
-      // Update the question paper's header_info with the current subject if needed
-      if (paperId) {
-        // First get the existing header_info to preserve other fields
-        const { data: existingPaper, error: fetchError } = await supabase
-          .from('question_papers')
-          .select('header_info')
-          .eq('id', paperId)
-          .single()
-        
-        if (!fetchError && existingPaper) {
-          // Only update if the subject is different or if header_info is missing
-          const currentHeaderInfo = existingPaper.header_info || {}
-          const needsUpdate = !currentHeaderInfo.subject || currentHeaderInfo.subject !== data.subject
-          
-          if (needsUpdate) {
-            const updatedHeaderInfo = {
-              ...currentHeaderInfo,
-              subject: data.subject,
-              exam_type: currentHeaderInfo.exam_type || 'MCQ',
-              total_marks: currentHeaderInfo.total_marks || '100',
-              school_name: currentHeaderInfo.school_name || 'বাংলাদেশ শিক্ষা বোর্ড',
-              exam_name: currentHeaderInfo.exam_name || 'বার্ষিক পরীক্ষা'
-            }
-            
-            const { error: updateError } = await supabase
-              .from('question_papers')
-              .update({
-                header_info: updatedHeaderInfo
-              })
-              .eq('id', paperId)
-            
-            if (updateError) {
-              console.error('Error updating question paper header:', updateError)
-            }
-          }
-        }
-      }
+      // No need to update existing paper headers - they should remain unchanged
+      // This prevents the bug where all questions in a paper get their subjects changed
 
       // Transform question to new format
       const questionToSave = {
@@ -344,44 +322,68 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
     if (!editForm) return
 
     try {
-      // First, get the existing question paper to preserve other header info
+      // Get the current question to check if we need to move it to a different paper
       const questionToUpdate = savedQuestions.find(q => q.id === editForm.id)
-      if (questionToUpdate?.paper_id) {
-        // Get existing header_info
-        const { data: existingPaper, error: fetchError } = await supabase
-          .from('question_papers')
-          .select('header_info')
-          .eq('id', questionToUpdate.paper_id)
-          .single()
+      if (!questionToUpdate) {
+        toast.error('Question not found')
+        return
+      }
+
+      const currentSubject = questionToUpdate.question_papers?.header_info?.subject
+      const newSubject = editForm.subject
+      
+      let targetPaperId = questionToUpdate.paper_id
+
+      // If subject is changing, we need to move the question to a different paper
+      if (currentSubject !== newSubject) {
+        const paperTitle = editForm.question_set ? 
+          `${editForm.question_set} - ${newSubject}` : 
+          `${newSubject} Questions`
         
-        if (!fetchError && existingPaper) {
-          // Only update if the subject is different
-          const currentHeaderInfo = existingPaper.header_info || {}
-          const needsUpdate = !currentHeaderInfo.subject || currentHeaderInfo.subject !== editForm.subject
+        // Find or create a paper for the new subject
+        const { data: targetPaper } = await supabase
+          .from('question_papers')
+          .select('id')
+          .eq('user_id', user!.id)
+          .eq('title', paperTitle)
+          .filter('header_info->>subject', 'eq', newSubject)
+          .maybeSingle()
+        
+        if (targetPaper) {
+          targetPaperId = targetPaper.id
+        } else {
+          // Create new paper for the new subject
+          const { data: newPaper, error: paperError } = await supabase
+            .from('question_papers')
+            .insert({
+              user_id: user!.id,
+              title: paperTitle,
+              header_info: {
+                subject: newSubject,
+                exam_type: 'MCQ',
+                total_marks: '100',
+                school_name: 'বাংলাদেশ শিক্ষা বোর্ড',
+                exam_name: 'বার্ষিক পরীক্ষা'
+              }
+            })
+            .select('id')
+            .single()
           
-          if (needsUpdate) {
-            const updatedHeaderInfo = {
-              ...currentHeaderInfo,
-              subject: editForm.subject
-            }
-            
-            const { error: headerError } = await supabase
-              .from('question_papers')
-              .update({
-                header_info: updatedHeaderInfo
-              })
-              .eq('id', questionToUpdate.paper_id)
-            
-            if (headerError) {
-              console.error('Error updating question paper header:', headerError)
-            }
+          if (paperError || !newPaper) {
+            toast.error('Failed to create question paper for new subject')
+            console.error(paperError)
+            return
           }
+          
+          targetPaperId = newPaper.id
         }
       }
 
+      // Update the question with new data and potentially new paper
       const { error } = await supabase
         .from('questions')
         .update({
+          paper_id: targetPaperId,
           question_text: editForm.question_text,
           options: [editForm.option_a, editForm.option_b, editForm.option_c, editForm.option_d],
           correct_answer: editForm.correct_answer,
@@ -642,7 +644,7 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
       <Card>
         <CardHeader>
           <CardTitle className="text-xl font-semibold">
-            সংরক্ষিত প্রশ্নসমূহ ({savedQuestions.length})
+            সংরক্ষিত প্রশ্নসমূহ ({displayedQuestions.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -650,13 +652,13 @@ export default function QuestionForm({ onQuestionAdded, user, selectedSubject }:
             <div className="flex justify-center items-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : savedQuestions.length === 0 ? (
+          ) : displayedQuestions.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               কোন প্রশ্ন সংরক্ষিত নেই
             </div>
           ) : (
             <div className="space-y-4 max-h-96 overflow-y-auto">
-              {savedQuestions.map((question) => (
+              {displayedQuestions.map((question) => (
                 <div key={question.id} className="border rounded-lg p-4 bg-gray-50">
                   {editingQuestion === question.id ? (
                     // Edit mode

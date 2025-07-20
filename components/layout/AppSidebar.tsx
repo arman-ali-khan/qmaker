@@ -124,11 +124,25 @@ export default function AppSidebar({ user, onQuestionSelect, onSubjectSelect }: 
       // Get question counts for each subject
       const subjectsWithCounts = await Promise.all(
         (subjectsData || []).map(async (subject) => {
+          // First, get paper IDs for this subject and user
+          const { data: paperIds } = await supabase
+            .from('question_papers')
+            .select('id')
+            .eq('user_id', user.id)
+            .filter('header_info->>subject', 'eq', subject.name)
+
+          if (!paperIds || paperIds.length === 0) {
+            return {
+              ...subject,
+              question_count: 0
+            }
+          }
+
+          // Then, count questions for these papers
           const { count } = await supabase
             .from('questions')
             .select('*', { count: 'exact', head: true })
-            .filter('question_papers.user_id', 'eq', user.id)
-            .filter('question_papers.header_info->>subject', 'eq', subject.name)
+            .in('paper_id', paperIds.map(p => p.id))
 
           return {
             ...subject,
@@ -303,6 +317,8 @@ export default function AppSidebar({ user, onQuestionSelect, onSubjectSelect }: 
     onSubjectSelect?.(subject)
   }
 
+  const totalQuestionCount = subjects.reduce((total, subject) => total + (subject.question_count || 0), 0)
+
   const filteredQuestions = savedQuestions.filter(question =>
     question.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
     question.question_papers?.header_info?.subject?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -342,146 +358,7 @@ export default function AppSidebar({ user, onQuestionSelect, onSubjectSelect }: 
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Create Question Form */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create Question
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <Card className="border-0 shadow-none">
-              <CardContent className="p-3">
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-                    <FormField
-                      control={form.control}
-                      name="subject"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Subject</FormLabel>
-                          <FormControl>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Select subject" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {subjects.map((subject) => (
-                                  <SelectItem key={subject.id} value={subject.name}>
-                                    {subject.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="question_text"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Question</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Enter your question..."
-                              className="min-h-[60px] text-xs resize-none"
-                            />
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="difficulty"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Difficulty</FormLabel>
-                          <FormControl>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="easy">Easy</SelectItem>
-                                <SelectItem value="medium">Medium</SelectItem>
-                                <SelectItem value="hard">Hard</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Options */}
-                    <div className="space-y-2">
-                      <Label className="text-xs">Options</Label>
-                      {['A', 'B', 'C', 'D'].map((option, index) => (
-                        <FormField
-                          key={option}
-                          control={form.control}
-                          name={`options.${index}`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  placeholder={`Option ${option}`}
-                                  className="h-8 text-xs"
-                                />
-                              </FormControl>
-                              <FormMessage className="text-xs" />
-                            </FormItem>
-                          )}
-                        />
-                      ))}
-                    </div>
-
-                    <FormField
-                      control={form.control}
-                      name="correct_answer"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Correct Answer</FormLabel>
-                          <FormControl>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="A">A</SelectItem>
-                                <SelectItem value="B">B</SelectItem>
-                                <SelectItem value="C">C</SelectItem>
-                                <SelectItem value="D">D</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormControl>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button 
-                      type="submit" 
-                      className="w-full h-8 text-xs" 
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Saving...' : 'Save Question'}
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator />
+      
 
         {/* Subjects Navigation */}
         <SidebarGroup>
@@ -500,7 +377,7 @@ export default function AppSidebar({ user, onQuestionSelect, onSubjectSelect }: 
                   <FileText className="h-4 w-4" />
                   <span>All Subjects</span>
                   <Badge variant="secondary" className="ml-auto">
-                    {savedQuestions.length}
+                    {totalQuestionCount}
                   </Badge>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -514,7 +391,7 @@ export default function AppSidebar({ user, onQuestionSelect, onSubjectSelect }: 
                     <BookOpen className="h-4 w-4" />
                     <span className="truncate">{subject.name}</span>
                     <Badge variant="secondary" className="ml-auto">
-                      {subject.lenth}
+                      {subject.question_count}
                     </Badge>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

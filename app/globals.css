@@ -21,6 +21,12 @@
   }
 }
 
+header{
+    position: sticky;
+    top: 0;
+    background: #fff;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
